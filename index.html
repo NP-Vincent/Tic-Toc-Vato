@@ -4,7 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🕶️ Tic Tac Vato — Minimal</title>
-  <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://example.com/og.png","button":{"title":"Play Tic Tac Vato","action":{"type":"launch_frame"}}}' />
+  <meta name="fc:miniapp" content='{
+  "version":"1",
+  "imageUrl":"https://np-vincent.github.io/Tic-Toc-Vato/assets/og.png",
+  "button":{
+    "title":"Play Tic Tac Vato",
+    "action":{
+      "type":"launch_frame",
+      "name":"Tic Tac Vato",                      <!-- Required -->
+      "url":"https://np-vincent.github.io/Tic-Toc-Vato/index.html",
+      "splashImageUrl":"https://np-vincent.github.io/Tic-Toc-Vato/assets/splash.png",
+      "splashBackgroundColor":"#FF6B00"
+    }
+  }
+}' />
   <meta name="fc:frame" content='{"version":"1","imageUrl":"https://example.com/og.png","button":{"title":"Play Tic Tac Vato","action":{"type":"launch_frame"}}}' />
   <style>
     body { font-family: 'Courier New', monospace; max-width: 420px; margin: 0 auto; padding: 20px; background: #121212; color: #f0f0f0; }
