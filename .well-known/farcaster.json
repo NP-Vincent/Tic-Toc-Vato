@@ -4,16 +4,16 @@
     "payload": "TODO",
     "signature": "TODO"
   },
-  "miniapp": {
-    "version": "1",
-    "name": "Tic Tac Vato",
-    "iconUrl": "https://example.com/icon.png",
-    "homeUrl": "https://example.com/index.html",
-    "imageUrl": "https://example.com/og.png",
-    "buttonTitle": "Play",
-    "splashImageUrl": "https://example.com/icon.png",
-    "splashBackgroundColor": "#000000",
-    "requiredChains": ["eip155:42161"],
-    "requiredCapabilities": ["wallet.getEthereumProvider"]
-  }
+"miniapp": {
+  "version": "1",
+  "name": "Tic Tac Vato",
+  "iconUrl": "https://np-vincent.github.io/Tic-Tac-Vato/assets/icon.jpg",
+  "homeUrl": "https://np-vincent.github.io/Tic-Tac-Vato/index.html",
+  "imageUrl": "https://np-vincent.github.io/Tic-Tac-Vato/assets/og.jpg",
+  "buttonTitle": "Play",
+  "splashImageUrl": "https://np-vincent.github.io/Tic-Tac-Vato/assets/og.jpg",
+  "splashBackgroundColor": "#FF6B00",
+  "requiredChains": ["eip155:42161"],
+  "requiredCapabilities": ["wallet.getEthereumProvider"]
+}
 }
