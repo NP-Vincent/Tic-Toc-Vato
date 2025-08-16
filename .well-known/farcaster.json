@@ -1,19 +1,20 @@
 {
-  "accountAssociation": {
-    "header": "TODO",
-    "payload": "TODO",
-    "signature": "TODO"
+  "frame": {
+    "name": "Tic Toc Vato",
+    "version": "1",
+    "iconUrl": "https://np-vincent.github.io/Tic-Toc-Vato/assets/icon.jpg",
+    "homeUrl": "https://https://np-vincent.github.io/Tic-Toc-Vato/",
+    "imageUrl": "https://np-vincent.github.io/Tic-Toc-Vato/assets/og.jpg",
+    "splashImageUrl": "https://np-vincent.github.io/Tic-Toc-Vato/assets/og.jpg",
+    "splashBackgroundColor": "#FF6B00",
+    "webhookUrl": "https://https://np-vincent.github.io/Tic-Toc-Vato//api/webhook",
+    "subtitle": "Outsmart the code cholo or lose your crypto!",
+    "description": "Tic Tac Vato, How Good Are You?",
+    "primaryCategory": "games"
   },
-"miniapp": {
-  "version": "1",
-  "name": "Tic Tac Vato",
-  "iconUrl": "https://np-vincent.github.io/Tic-Tac-Vato/assets/icon.jpg",
-  "homeUrl": "https://np-vincent.github.io/Tic-Tac-Vato/index.html",
-  "imageUrl": "https://np-vincent.github.io/Tic-Tac-Vato/assets/og.jpg",
-  "buttonTitle": "Play",
-  "splashImageUrl": "https://np-vincent.github.io/Tic-Tac-Vato/assets/og.jpg",
-  "splashBackgroundColor": "#FF6B00",
-  "requiredChains": ["eip155:42161"],
-  "requiredCapabilities": ["wallet.getEthereumProvider"]
-}
+  "accountAssociation": {
+    "header": "eyJmaWQiOjExMTUxNTIsInR5cGUiOiJhdXRoIiwia2V5IjoiMHg4RGI0NWY5MGVmNGVCRkM2RDEzM0MxYjJjNmFjNzQyQjJBRTY1M0FhIn0",
+    "payload": "eyJkb21haW4iOiJodHRwczovL25wLXZpbmNlbnQuZ2l0aHViLmlvL1RpYy1Ub2MtVmF0by8ifQ",
+    "signature": "NMQABgFRCAujoL/AOK9OGuuxCkFHQcDF90G0V4FgU3VwEqNllBk8Tsqtlf3RyHfuKCwlQqa6TpLUV7kM0Y2zPRw="
+  }
 }
