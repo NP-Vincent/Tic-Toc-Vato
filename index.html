@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🕶️ Tic Tac Vato — Minimal</title>
+  <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://example.com/og.png","button":{"title":"Play Tic Tac Vato","action":{"type":"launch_frame"}}}' />
+  <meta name="fc:frame" content='{"version":"1","imageUrl":"https://example.com/og.png","button":{"title":"Play Tic Tac Vato","action":{"type":"launch_frame"}}}' />
   <style>
     body { font-family: 'Courier New', monospace; max-width: 420px; margin: 0 auto; padding: 20px; background: #121212; color: #f0f0f0; }
     h1 { color: #FF6B00; text-align: center; font-size: 2.2rem; margin: 6px 0 2px; text-shadow: 2px 2px 4px #000; }
@@ -194,7 +196,7 @@
     }
 
     // Payment + play
-    const HOUSE_WALLET = '0xHOUSE_WALLET_PLACEHOLDER'; // TODO: replace
+    const HOUSE_WALLET = '0x8Db45f90ef4eBFC6D133C1b2c6ac742B2AE653Aa';
     els.play.onclick = async () => {
       try {
         // Entry fee = 1% of current pool
