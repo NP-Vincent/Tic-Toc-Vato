@@ -25,7 +25,7 @@ A minimalist Farcaster Mini App that lets users play Tic Tac Toe ("Tic Tac Vato"
 
 - You'll later need to **self-host** on a domain (e.g. GitHub Pages)
 - Replace placeholders:
-  - `0xHOUSE_WALLET_PLACEHOLDER` in `index.html`
+- House wallet address in `index.html` is set to `0x8Db45f90ef4eBFC6D133C1b2c6ac742B2AE653Aa`
   - Your GitHub Pages URL for manifest & domain identity
 - Enable **Developer Mode** in Farcaster web to preview the app:
   1. Sign into Farcaster
