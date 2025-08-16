@@ -168,17 +168,23 @@
       }
       return false;
     }
-    function minimax(b, p) {
+    function minimax(board, player) {
       const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-      const opp = p === "X" ? "O" : "X";
-      for (const [a,b,c] of W) if (b[a] && b[a]===b[b] && b[a]===b[c]) return { score: b[a]==="O" ? 10 : -10 };
-      if (!b.includes("")) return { score: 0 };
+      const opp = player === "X" ? "O" : "X";
+      for (const [i, j, k] of W)
+        if (board[i] && board[i] === board[j] && board[i] === board[k])
+          return { score: board[i] === "O" ? 10 : -10 };
+      if (!board.includes("")) return { score: 0 };
       const moves = [];
-      for (let i=0;i<9;i++) if (b[i]==="") {
-        b[i]=p; const r=minimax(b,opp); moves.push({index:i, score:r.score}); b[i]="";
+      for (let idx = 0; idx < 9; idx++) if (board[idx] === "") {
+        board[idx] = player;
+        const result = minimax(board, opp);
+        moves.push({ index: idx, score: result.score });
+        board[idx] = "";
       }
-      if (p==="O") return moves.reduce((m,x)=> x.score>m.score?x:m, moves[0]);
-      return moves.reduce((m,x)=> x.score<m.score?x:m, moves[0]);
+      return (player === "O")
+        ? moves.reduce((best, x) => x.score > best.score ? x : best, moves[0])
+        : moves.reduce((best, x) => x.score < best.score ? x : best, moves[0]);
     }
     function vatoMove() {
       els.status.innerHTML = "🤔 <strong>Vato thinking…</strong>";
