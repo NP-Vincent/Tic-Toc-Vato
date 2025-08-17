@@ -22,12 +22,20 @@ A minimalist Farcaster Mini App that lets users play Tic Tac Toe ("Tic Tac Vato"
 
 ---
 
-## Prerequisites
+## Deployment
 
+- Live app: [https://vato.sqmu.io](https://vato.sqmu.io)
+- Prize pool contract (proxy): `0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E`
+- Implementation: `0xA82ad49C77160D09F49c6f5fDf35d3000685b624`
+- ABI: `abi/TicTacVatoPrizePool.json`
+
+`index.html` fetches the ABI and contract address from the JSON file above. Update it if the contract redeploys or the domain changes.
+
+---
+
+## Prerequisites
 - You'll later need to **self-host** on a domain (e.g. GitHub Pages)
-- Replace placeholders:
-- `index.html` includes a `CONTRACT_ADDRESS` constant that must be updated once the contract is deployed
-  - Your GitHub Pages URL for manifest & domain identity
+- If you fork this project, replace the domain and update `abi/TicTacVatoPrizePool.json` with your own deployment details.
 - Enable **Developer Mode** in Farcaster web to preview the app:
   1. Sign into Farcaster
   2. Visit [Farcaster Dev Tools](https://farcaster.xyz/~/settings/developer-tools)

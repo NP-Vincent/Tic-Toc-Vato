@@ -19,6 +19,9 @@ This file is intended for AI agents (e.g. GitHub Copilot, ChatGPT / Codex) that 
    - Suggesting improvements for UX, Discoverability, Testing
    - Ensuring `sdk.actions.ready()` is used correctly, and other best practices
    - Maintaining the `contracts/` directory and keeping `index.html` in sync with the deployed contract address
+   - The prize pool contract is currently deployed at `0xA82ad49C77160D09F49c6f5fDf35d3000685b624` with proxy `0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E`
+   - `index.html` loads its ABI and address from `abi/TicTacVatoPrizePool.json`; update this file if redeploying
+   - The public site is hosted at `https://vato.sqmu.io`
 
 3. **Prompt the user with context-based questions**, **only referencing the docs** and not quoting from them verbatim. Example prompts:
    - “Should we create `farcaster.json` now with placeholders, or generate it later once the GH Pages URL is known?”
