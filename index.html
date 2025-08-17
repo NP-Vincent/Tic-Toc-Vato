@@ -94,15 +94,15 @@
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
     import {
       parseAbi, encodeFunctionData,
-      createPublicClient, http, custom, decodeFunctionResult, maxUint256
+      createPublicClient, http, custom
     } from 'https://esm.sh/viem@2.9.32';
     import { arbitrum } from 'https://esm.sh/viem/chains';
 
     (async () => {
-      // Hide splash; if not in host, ignore.
+      // Hide splash; if not in host, ignore errors.
       try { await sdk.actions.ready(); } catch {}
 
-      // Try to get Mini App provider (present in iOS app)
+      // Try to get Mini App provider (present in Farcaster iOS app).
       let provider;
       try { provider = await sdk.wallet.getEthereumProvider(); } catch {}
 
@@ -117,7 +117,7 @@
         debug:   document.getElementById('debug'),
       };
 
-      const CONTRACT = '0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E'; // proxy
+      const CONTRACT = '0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E'; // UUPS proxy
       const ABI = parseAbi([
         'function prizePool() view returns (uint256)',
         'function currentFee() view returns (uint256)',
@@ -125,12 +125,11 @@
         'function play() payable'
       ]);
 
-      // ---------- READS: Always succeed via RPC (safe). Prefer provider if possible. ----------
-      const ARB_RPC = 'https://arb1.arbitrum.io/rpc'; // replace with your own RPC if you have one
+      // ---- READS: Force RPC always (your provider blocks eth_call). ----
+      const ARB_RPC = 'https://arb1.arbitrum.io/rpc'; // swap for your Infura/Alchemy if you want
       const pub = createPublicClient({
         chain: arbitrum,
-        // If provider exists, viem will use it; otherwise fallback to RPC.
-        transport: (provider && typeof provider.request === 'function') ? custom(provider) : http(ARB_RPC),
+        transport: http(ARB_RPC), // IMPORTANT: never use provider here
       });
 
       const ARBITRUM_HEX = '0xa4b1';
@@ -144,6 +143,7 @@
 
       // ---------- Debug helpers ----------
       async function probe(method, params) {
+        if (!provider) return 'no provider';
         try { await provider.request({ method, params }); return 'ok'; }
         catch (e) { return (e && (e.code||'') + ' ' + (e.message||'unsupported')); }
       }
@@ -160,17 +160,17 @@
           lines.push(`accounts: ${Array.isArray(accts) ? accts.length : 'n/a'}`);
         } catch (e) { lines.push(`accounts error: ${e?.message}`); }
         if (provider) {
-          const pm = await probe('eth_call', [{to: CONTRACT, data:'0x'}, 'latest']);
-          lines.push(`eth_call: ${pm}`);
-          const ps = await probe('eth_sendTransaction', [{from:'0x0000000000000000000000000000000000000000', to: CONTRACT, value:'0x0'}]);
+          const ps = await probe('eth_sendTransaction',
+            [{from:'0x0000000000000000000000000000000000000000', to: CONTRACT, value:'0x0'}]);
           lines.push(`eth_sendTransaction: ${ps}`);
-          const pw = await probe('wallet_sendCalls', [{from:'0x0000000000000000000000000000000000000000', calls:[]}]);
+          const pw = await probe('wallet_sendCalls',
+            [{ chainId: ARBITRUM_HEX, from:'0x0000000000000000000000000000000000000000', atomicRequired: true, calls: [{ to: CONTRACT, data: '0x', value: '0x0' }] }]);
           lines.push(`wallet_sendCalls: ${pw}`);
         }
         els.debug.innerHTML = lines.join('\n');
       }
 
-      // ---------- Read helpers (RPC or provider) ----------
+      // ---------- Read helpers (RPC) ----------
       async function readPrizePool() {
         return pub.readContract({ address: CONTRACT, abi: ABI, functionName: 'prizePool' });
       }
@@ -297,9 +297,9 @@
         vatoMove();
       }));
 
-      // --- Pay & Play: prefer wallet_sendCalls (Mini App), fallback to eth_sendTransaction ---
+      // --- Pay & Play: prefer wallet_sendCalls with required fields, fallback to eth_sendTransaction ---
       els.play.onclick = async () => {
-        if (needsHost()) {
+        if (!provider || typeof provider.request !== 'function') {
           els.status.textContent = 'Open in Farcaster app to play.';
           return;
         }
@@ -308,17 +308,23 @@
           const [from] = await provider.request({ method: 'eth_accounts' }) || [];
           if (!from) throw new Error('No wallet account connected.');
 
-          const feeWei = await readCurrentFee();
+          const feeWei = await readCurrentFee(); // via RPC
           els.status.innerHTML = `⏳ <strong>Paying ${to6(feeWei)} ETH…</strong>`;
 
           const data = encodeFunctionData({ abi: ABI, functionName: 'play', args: [] });
 
           let sent = false, lastErr;
-          // 1) Try EIP-5792 (expected in Mini App hosts)
+
+          // 1) Try EIP-5792 with required fields
           try {
             await provider.request({
               method: 'wallet_sendCalls',
-              params: [{ from, calls: [{ to: CONTRACT, data, value: '0x' + BigInt(feeWei).toString(16) }] }]
+              params: [{
+                chainId: ARBITRUM_HEX,
+                from,
+                atomicRequired: true,
+                calls: [{ to: CONTRACT, data, value: '0x' + BigInt(feeWei).toString(16) }]
+              }]
             });
             sent = true;
           } catch (e) { lastErr = e; }
@@ -336,7 +342,6 @@
 
           if (!sent) throw lastErr || new Error('No supported tx method in this host.');
 
-          // Let state index, then refresh
           setTimeout(refreshUI, 1500);
 
           resetBoard();
