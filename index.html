@@ -88,19 +88,14 @@
 
   <script type="module">
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
-    import {
-      parseAbi,
-      encodeFunctionData,
-      decodeFunctionResult,
-    } from 'https://esm.sh/viem@2.9.32';
+    import { parseAbi, encodeFunctionData, decodeFunctionResult } from 'https://esm.sh/viem@2.9.32';
 
     (async () => {
-      // Clear splash as early as possible
+      // Hide host splash ASAP
       try { await sdk.actions.ready(); } catch {}
 
-      // Get the Mini App wallet provider (EIP-1193)
+      // Mini App provider (EIP-1193)
       const provider = await sdk.wallet.getEthereumProvider();
-
       const els = {
         poolEth: document.getElementById('poolEth'),
         feeEth:  document.getElementById('feeEth'),
@@ -116,8 +111,9 @@
         'function prizePool() view returns (uint256)',
         'function currentFee() view returns (uint256)',
         'function getLeaderboard() view returns (address[3], uint256[3])',
-        'function play() payable',
+        'function play() payable'
       ]);
+
       const ARBITRUM_HEX = '0xa4b1';
       const ETH = 10n ** 18n;
       const to6 = (wei) => {
@@ -127,37 +123,35 @@
         return `${whole}.${frac.toString().padStart(6, '0')}`;
       };
 
-      async function chainOk() {
+      async function isArbitrum() {
         try { return (await provider.request({ method: 'eth_chainId' })) === ARBITRUM_HEX; }
         catch { return false; }
       }
 
-      // ---- Low-level eth_call helpers (no PublicClient) ----
-      async function callView(fn, args = []) {
-        const data = encodeFunctionData({ abi: ABI, functionName: fn, args });
-        const raw = await provider.request({
+      // ---- Direct eth_call helpers (no RPC URL, pure provider) ----
+      async function ethCall(functionName, args = []) {
+        const data = encodeFunctionData({ abi: ABI, functionName, args });
+        return provider.request({
           method: 'eth_call',
           params: [{ to: CONTRACT, data }, 'latest']
         });
-        return { data, raw };
       }
-
       async function readPrizePool() {
-        const { raw } = await callView('prizePool');
+        const raw = await ethCall('prizePool');
         return BigInt(raw);
       }
       async function readCurrentFee() {
-        const { raw } = await callView('currentFee');
+        const raw = await ethCall('currentFee');
         return BigInt(raw);
       }
       async function readLeaderboard() {
-        const { data, raw } = await callView('getLeaderboard');
+        const raw = await ethCall('getLeaderboard');
         const [addrs, amts] = decodeFunctionResult({ abi: ABI, functionName: 'getLeaderboard', data: raw });
         return { addrs, amts };
       }
 
       async function refreshUI() {
-        if (!(await chainOk())) {
+        if (!(await isArbitrum())) {
           els.status.textContent = 'Switch to Arbitrum One (42161) to load live pool.';
           return;
         }
@@ -182,7 +176,7 @@
         }
       }
 
-      // Wallet connect (then enforce chain)
+      // Connect then switch chain
       let player = '';
       els.connect.onclick = async () => {
         try {
@@ -191,7 +185,7 @@
           player = accounts[0] || '';
           if (!player) return;
 
-          // Enforce Arbitrum AFTER user interaction
+          // Enforce Arbitrum AFTER connect
           const cid = await provider.request({ method: 'eth_chainId' });
           if (cid !== ARBITRUM_HEX) {
             await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
@@ -208,7 +202,7 @@
         }
       };
 
-      // ---- Game logic (unchanged) ----
+      // --- Game logic (unchanged) ---
       let board = ["","","","","","","","",""];
       let gameActive = false;
       const cells = [...document.querySelectorAll('.cell')];
@@ -271,27 +265,33 @@
         cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
       }
 
-      // ---- On-chain Pay & Play via provider only ----
+      // --- Pay & Play using EIP-5792 wallet_sendCalls ---
       async function onPlay() {
         try {
-          const ok = await chainOk();
-          if (!ok) {
+          if (!(await isArbitrum())) {
             await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
           }
           const accounts = await provider.request({ method: 'eth_accounts' });
           const from = accounts?.[0];
           if (!from) throw new Error('No wallet account connected.');
 
+          // Read current fee first
           const feeWei = await readCurrentFee();
           els.status.innerHTML = `⏳ <strong>Paying ${to6(feeWei)} ETH…</strong>`;
 
+          // Encode play() call
           const data = encodeFunctionData({ abi: ABI, functionName: 'play', args: [] });
-          const txHash = await provider.request({
-            method: 'eth_sendTransaction',
-            params: [{ from, to: CONTRACT, data, value: '0x' + BigInt(feeWei).toString(16) }],
+
+          // Use EIP-5792 wallet_sendCalls (supported in Farcaster Mini Apps)
+          const res = await provider.request({
+            method: 'wallet_sendCalls',
+            params: [{
+              from,
+              calls: [{ to: CONTRACT, data, value: '0x' + BigInt(feeWei).toString(16) }]
+            }]
           });
 
-          // simple delay: let the node index the state, then refresh
+          // Give indexers a moment; then refresh on-chain UI
           setTimeout(refreshUI, 1500);
 
           resetBoard();
@@ -307,8 +307,10 @@
 
       els.play.onclick = onPlay;
 
-      // Initial read (no wallet required)
+      // Initial read (no wallet required, but requires correct chain)
       await refreshUI();
+      // Optional: periodic refresh
+      // setInterval(refreshUI, 8000);
     })();
   </script>
 </body>
