@@ -62,7 +62,7 @@
   <div class="panel" id="economy">
     <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
     <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">0.000010</span> ETH</strong></div></div>
-    <div class="row"><div>📈 Target</div><div><strong>0.100000 ETH</strong></div></div>
+    <div class="row"><div>📈 Target</div><div><strong><span id="targetEth">0.100000</span> ETH</strong></div></div>
     <small class="mono">When the pool hits 0.1 ETH, top 3 spenders win 40%, 30% and 20%. The pool then resets to 0.001 ETH.</small>
   </div>
 
@@ -96,7 +96,17 @@
     (async () => {
       await sdk.actions.ready();
 
-      const provider = await sdk.wallet.getEthereumProvider();
+      let provider = null;
+      try {
+        provider = await sdk.wallet.getEthereumProvider();
+      } catch (e) {
+        console.warn('Farcaster provider unavailable', e);
+      }
+      if (!provider && window.ethereum) provider = window.ethereum;
+      if (!provider) {
+        document.getElementById('status').textContent = 'Wallet provider not found.';
+        return;
+      }
 
       const ARBITRUM_HEX = '0xa4b1';
       let chainId = await provider.request({ method: 'eth_chainId' });
@@ -106,7 +116,7 @@
           chainId = ARBITRUM_HEX;
         } catch (e) {
           document.getElementById('status').textContent = 'Please switch to Arbitrum One (42161).';
-          throw e;
+          return;
         }
       }
 
@@ -119,6 +129,7 @@
       const els = {
         poolEth: document.getElementById('poolEth'),
         feeEth: document.getElementById('feeEth'),
+        targetEth: document.getElementById('targetEth'),
         connect: document.getElementById('connect'),
         play: document.getElementById('play'),
         status: document.getElementById('status'),
@@ -131,6 +142,8 @@
       function fmtEth(v) {
         return Number(ethers.formatEther(v)).toFixed(6);
       }
+
+      els.targetEth.textContent = fmtEth(MAX_POOL);
 
       async function refreshEconomy() {
         const poolWei = await contract.prizePool();
@@ -152,17 +165,22 @@
       await refreshLeaderboard();
 
       els.connect.onclick = async () => {
-        const accounts = await provider.request({ method: 'eth_requestAccounts' });
-        player = accounts[0];
-        if (!player) return;
-        const signer = await ethersProvider.getSigner();
-        contractWithSigner = contract.connect(signer);
-        els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
-        els.connect.style.background = '#4CAF50';
-        els.play.disabled = false;
-        els.status.innerHTML = '🕶️ <strong>Vato ready!</strong> Pay to play';
-        await refreshEconomy();
-        await refreshLeaderboard();
+        try {
+          const accounts = await provider.request({ method: 'eth_requestAccounts' });
+          player = accounts[0];
+          if (!player) return;
+          const signer = await ethersProvider.getSigner();
+          contractWithSigner = contract.connect(signer);
+          els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
+          els.connect.style.background = '#4CAF50';
+          els.play.disabled = false;
+          els.status.innerHTML = '🕶️ <strong>Vato ready!</strong> Pay to play';
+          await refreshEconomy();
+          await refreshLeaderboard();
+        } catch (err) {
+          console.error(err);
+          els.status.textContent = 'Wallet connection rejected.';
+        }
       };
 
       let board = ["","","","","","","","",""];
