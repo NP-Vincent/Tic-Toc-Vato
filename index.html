@@ -56,10 +56,10 @@
   <div class="subtitle">Outwit the Code Cholo</div>
 
   <div class="panel" id="economy">
-    <div class="row"><div>🏦 Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
+    <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
     <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">0.000010</span> ETH</strong></div></div>
     <div class="row"><div>📈 Target</div><div><strong>0.100000 ETH</strong></div></div>
-    <small class="mono">50% fee → house, 50% → pool. At 0.1 ETH, top 3 spenders get 40/30/20% (demo only; real payouts require a backend or contract).</small>
+    <small class="mono">When the pool hits 0.1 ETH, top 3 spenders win 40%, 30% and 20%. The pool then resets to 0.001 ETH.</small>
   </div>
 
   <div class="row"><button id="connect">🔓 Connect Wallet</button></div>
@@ -80,7 +80,7 @@
   <div id="status">👉 Connect wallet to challenge the vato</div>
 
   <div class="panel" id="leaderboard">
-    <div class="row"><div>🏆 Top Spenders (demo)</div><div><button id="resetLb" style="width:auto;">Reset</button></div></div>
+    <div class="row"><div>🏆 Top Spenders</div></div>
     <ol id="lbList"><li>—</li><li>—</li><li>—</li></ol>
   </div>
 
@@ -117,8 +117,7 @@
         play: document.getElementById('play'),
         status: document.getElementById('status'),
         board: document.getElementById('board'),
-        lbList: document.getElementById('lbList'),
-        resetLb: document.getElementById('resetLb'),
+        lbList: document.getElementById('lbList')
       };
 
     // Economy in wei (BigInt); ETH = 1e18 wei
@@ -257,7 +256,7 @@
         if (pool > MAX_POOL) pool = MAX_POOL;
         updateEconomyUI();
 
-        // Track spender for leaderboard (demo only)
+        // Track spender for leaderboard
         const prev = spendMap.get(player) || 0n;
         spendMap.set(player, prev + fee);
         updateLeaderboardUI();
@@ -269,9 +268,9 @@
         els.play.style.display = "none";
         els.status.innerHTML = "🔫 <strong>Your move</strong> (You're X)";
 
-        // Payout trigger (demo message only)
+        // Payout trigger message
         if (pool >= MAX_POOL) {
-          els.status.innerHTML += `<br>💰 <strong>PAYOUT TRIGGERED</strong> — 40/30/20% to top 3 (demo only)`;
+          els.status.innerHTML += `<br>💰 <strong>PAYOUT TRIGGERED</strong> — 40/30/20% to top 3`;
           pool = MIN_POOL; updateEconomyUI();
           // spendMap.clear(); updateLeaderboardUI(); // optional reset
         }
@@ -280,9 +279,6 @@
         els.status.innerHTML = `❌ <strong>Error:</strong> ${err.message || err}`;
       }
     };
-
-    // Demo leaderboard reset
-    els.resetLb.onclick = () => { spendMap.clear(); updateLeaderboardUI(); };
     })();
   </script>
 </body>
