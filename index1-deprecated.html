@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🕶️ Tic Tac Vato — Minimal</title>
 
-  <!-- Farcaster Mini App metadata (no comments inside JSON) -->
+  <!-- Farcaster Mini App / Frame metadata (no comments inside JSON) -->
   <meta name="fc:miniapp" content='{
     "version":"1",
     "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
@@ -79,7 +79,7 @@
     <div class="cell" data-index="8"></div>
   </div>
 
-  <div id="status">Tap “Connect Wallet” to load the live pool.</div>
+  <div id="status">Loading…</div>
 
   <div class="panel" id="leaderboard">
     <div class="row"><div>🏆 Top Spenders</div></div>
@@ -88,19 +88,20 @@
 
   <script type="module">
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
-    import { parseAbi, encodeFunctionData, decodeFunctionResult } from 'https://esm.sh/viem@2.9.32';
+    import {
+      parseAbi, encodeFunctionData, decodeFunctionResult,
+      createPublicClient, http, custom
+    } from 'https://esm.sh/viem@2.9.32';
+    import { arbitrum } from 'https://esm.sh/viem/chains';
 
     (async () => {
       // Clear host splash ASAP
       try { await sdk.actions.ready(); } catch {}
 
-      const provider = await sdk.wallet.getEthereumProvider();
-      if (!provider || typeof provider.request !== 'function') {
-        document.getElementById('status').textContent = 'Mini App wallet provider missing.';
-        throw new Error('No EIP-1193 provider');
-      }
+      // Try to get Mini App provider (EIP-1193)
+      let provider;
+      try { provider = await sdk.wallet.getEthereumProvider(); } catch {}
 
-      // UI
       const els = {
         poolEth: document.getElementById('poolEth'),
         feeEth:  document.getElementById('feeEth'),
@@ -111,8 +112,6 @@
         lbList:  document.getElementById('lbList'),
       };
 
-      // Chain / contract
-      const ARBITRUM_HEX = '0xa4b1';
       const CONTRACT = '0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E';
       const ABI = parseAbi([
         'function prizePool() view returns (uint256)',
@@ -120,6 +119,16 @@
         'function getLeaderboard() view returns (address[3], uint256[3])',
         'function play() payable'
       ]);
+
+      // Read-only fallback RPC (safe; no keys). Replace with your Alchemy/Infura for robustness.
+      const ARB_RPC_FALLBACK = 'https://arb1.arbitrum.io/rpc';
+      // Public client for reads: prefer provider, else fallback RPC
+      const pub = createPublicClient({
+        chain: arbitrum,
+        transport: (provider && typeof provider.request === 'function') ? custom(provider) : http(ARB_RPC_FALLBACK),
+      });
+
+      const ARBITRUM_HEX = '0xa4b1';
       const ETH = 10n ** 18n;
       const to6 = (wei) => {
         const w = BigInt(wei);
@@ -128,65 +137,67 @@
         return `${whole}.${frac.toString().padStart(6, '0')}`;
       };
 
-      // Helpers
-      const isArbitrum = async () => (await provider.request({ method: 'eth_chainId' })) === ARBITRUM_HEX;
-
-      // Direct eth_call helpers (pure provider, no RPC URL)
-      async function ethCall(functionName, args = []) {
-        const data = encodeFunctionData({ abi: ABI, functionName, args });
-        return provider.request({
-          method: 'eth_call',
-          params: [{ to: CONTRACT, data }, 'latest']
-        });
-      }
+      // -------- Reads (work in Chrome via fallback, and in Mini App host via provider) --------
       async function readPrizePool() {
-        const raw = await ethCall('prizePool'); return BigInt(raw);
+        return pub.readContract({ address: CONTRACT, abi: ABI, functionName: 'prizePool' });
       }
       async function readCurrentFee() {
-        const raw = await ethCall('currentFee'); return BigInt(raw);
+        return pub.readContract({ address: CONTRACT, abi: ABI, functionName: 'currentFee' });
       }
       async function readLeaderboard() {
-        const raw = await ethCall('getLeaderboard');
-        const [addrs, amts] = decodeFunctionResult({ abi: ABI, functionName: 'getLeaderboard', data: raw });
+        const [addrs, amts] = await pub.readContract({ address: CONTRACT, abi: ABI, functionName: 'getLeaderboard' });
         return { addrs, amts };
       }
 
       async function refreshUI() {
-        const ok = await isArbitrum();
-        if (!ok) { els.status.textContent = 'Switching to Arbitrum…'; await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] }); }
         try {
           const [poolWei, feeWei, lb] = await Promise.all([readPrizePool(), readCurrentFee(), readLeaderboard()]);
           els.poolEth.textContent = to6(poolWei);
           els.feeEth.textContent  = to6(feeWei);
           const rows = [0,1,2].map(i => {
-            const a = lb.addrs[i], v = BigInt(lb.amts[i]);
+            const a = lb.addrs[i], v = BigInt(lb.amts[i] || 0);
             if (!a || a.toLowerCase() === '0x0000000000000000000000000000000000000000' || v === 0n) return null;
             return `<li>${a.slice(0,6)}…${a.slice(-4)} — ${to6(v)} ETH</li>`;
           }).filter(Boolean);
           els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
-          els.status.textContent = 'Ready. Pay to play.';
+          els.status.textContent = provider ? 'Tap Connect to play.' : 'Viewing only. Open in Farcaster app to play.';
         } catch (e) {
           console.error(e);
           els.status.textContent = 'Failed to read on-chain state.';
         }
       }
 
-      // Connect → switch chain → load state
+      // Load data immediately (works in Chrome via fallback)
+      await refreshUI();
+      // Optional periodic refresh for Chrome embeds
+      // setInterval(refreshUI, 8000);
+
+      // -------- Connect + Play (requires Mini App provider) --------
+      const needsHost = () => !provider || typeof provider.request !== 'function';
+
+      async function ensureArbitrum() {
+        const cid = await provider.request({ method: 'eth_chainId' });
+        if (cid !== ARBITRUM_HEX) {
+          await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
+        }
+      }
+
       let player = '';
       els.connect.onclick = async () => {
+        if (needsHost()) {
+          els.status.textContent = 'Open in Farcaster app to connect wallet.';
+          return;
+        }
         try {
           await provider.request({ method: 'eth_requestAccounts' });
           const accounts = await provider.request({ method: 'eth_accounts' });
           player = accounts[0] || '';
           if (!player) return;
-
-          if (!(await isArbitrum())) {
-            await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
-          }
-
+          await ensureArbitrum();
           els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
           els.connect.style.background = '#4CAF50';
           els.play.disabled = false;
+          els.status.textContent = 'Ready. Pay to play.';
           await refreshUI();
         } catch (e) {
           console.error(e);
@@ -198,17 +209,6 @@
       let board = ["","","","","","","","",""];
       let gameActive = false;
       const cells = [...document.querySelectorAll('.cell')];
-
-      cells.forEach(c => c.addEventListener('click', e => {
-        if (!gameActive) return;
-        const i = +e.currentTarget.dataset.index;
-        if (board[i] !== "") return;
-        board[i] = "X";
-        e.currentTarget.textContent = "X";
-        e.currentTarget.classList.add('x');
-        if (checkEnd()) return;
-        vatoMove();
-      }));
 
       function checkEnd() {
         const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
@@ -224,21 +224,20 @@
         }
         return false;
       }
-      function minimax(board, player) {
+      function minimax(b, p) {
         const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-        const opp = player === "X" ? "O" : "X";
+        const opp = p === "X" ? "O" : "X";
         for (const [i, j, k] of W)
-          if (board[i] && board[i] === board[j] && board[i] === board[k])
-            return { score: board[i] === "O" ? 10 : -10 };
-        if (!board.includes("")) return { score: 0 };
+          if (b[i] && b[i] === b[j] && b[i] === b[k]) return { score: b[i] === "O" ? 10 : -10 };
+        if (!b.includes("")) return { score: 0 };
         const moves = [];
-        for (let idx = 0; idx < 9; idx++) if (board[idx] === "") {
-          board[idx] = player;
-          const result = minimax(board, opp);
+        for (let idx = 0; idx < 9; idx++) if (b[idx] === "") {
+          b[idx] = p;
+          const result = minimax(b, opp);
           moves.push({ index: idx, score: result.score });
-          board[idx] = "";
+          b[idx] = "";
         }
-        return (player === "O")
+        return (p === "O")
           ? moves.reduce((best, x) => x.score > best.score ? x : best, moves[0])
           : moves.reduce((best, x) => x.score < best.score ? x : best, moves[0]);
       }
@@ -256,34 +255,49 @@
         board = ["","","","","","","","",""];
         cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
       }
+      cells.forEach(c => c.addEventListener('click', e => {
+        if (!gameActive) return;
+        const i = +e.currentTarget.dataset.index;
+        if (board[i] !== "") return;
+        board[i] = "X";
+        e.currentTarget.textContent = "X";
+        e.currentTarget.classList.add('x');
+        if (checkEnd()) return;
+        vatoMove();
+      }));
 
-      // --- Pay & Play with fallback between methods ---
-      async function onPlay() {
+      // --- Pay & Play with graceful fallback ---
+      els.play.onclick = async () => {
+        if (needsHost()) {
+          els.status.textContent = 'Open in Farcaster app to play.';
+          return;
+        }
         try {
-          if (!(await isArbitrum())) {
-            await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
-          }
+          await ensureArbitrum();
           const accounts = await provider.request({ method: 'eth_accounts' });
           const from = accounts?.[0];
           if (!from) throw new Error('No wallet account connected.');
 
-          // Read fee
           const feeWei = await readCurrentFee();
           els.status.innerHTML = `⏳ <strong>Paying ${to6(feeWei)} ETH…</strong>`;
 
-          // Encode play()
           const data = encodeFunctionData({ abi: ABI, functionName: 'play', args: [] });
 
-          // First try eth_sendTransaction (your original flow)
+          // Try eth_sendTransaction first (like your original)
+          let sent = false, lastErr;
           try {
             await provider.request({
               method: 'eth_sendTransaction',
               params: [{ from, to: CONTRACT, data, value: '0x' + BigInt(feeWei).toString(16) }]
             });
+            sent = true;
           } catch (e) {
-            // If method unsupported, try EIP-5792 wallet_sendCalls
-            const msg = (e && (e.code === -32601 || /method|unsupported/i.test(String(e.message)))) ? 'fallback' : 'rethrow';
-            if (msg === 'fallback') {
+            lastErr = e;
+          }
+
+          // If unsupported, try EIP-5792 wallet_sendCalls
+          if (!sent) {
+            try {
               await provider.request({
                 method: 'wallet_sendCalls',
                 params: [{
@@ -291,12 +305,15 @@
                   calls: [{ to: CONTRACT, data, value: '0x' + BigInt(feeWei).toString(16) }]
                 }]
               });
-            } else {
-              throw e;
+              sent = true;
+            } catch (e2) {
+              lastErr = e2;
             }
           }
 
-          // Give the host a tick to index, then refresh
+          if (!sent) throw lastErr || new Error('Transaction method not supported by this host.');
+
+          // Let indexers catch up; then refresh
           setTimeout(refreshUI, 1500);
 
           resetBoard();
@@ -308,12 +325,7 @@
           console.error(err);
           els.status.innerHTML = `❌ <strong>Error:</strong> ${err?.message || err}`;
         }
-      }
-
-      els.play.onclick = onPlay;
-
-      // Don’t read before connect (some hosts gate eth_call).
-      // After connect we switch chain and call refreshUI().
+      };
     })();
   </script>
 </body>
