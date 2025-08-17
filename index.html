@@ -1,37 +1,39 @@
 <!doctype html>
 <html lang="en">
-\3
-<meta charset="utf-8" />
+<head>
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🕶️ Tic Tac Vato — Minimal</title>
+
+  <!-- Farcaster Mini App / Frame metadata (no comments inside JSON) -->
   <meta name="fc:miniapp" content='{
-  "version":"1",
-  "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
-  "button":{
-    "title":"Play Tic Tac Vato",
-    "action":{
-      "type":"launch_frame",
-      "name":"Tic Tac Vato",                      
-      "url":"https://vato.sqmu.io/index.html",
-      "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
-      "splashBackgroundColor":"#FF6B00"
+    "version":"1",
+    "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
+    "button":{
+      "title":"Play Tic Tac Vato",
+      "action":{
+        "type":"launch_frame",
+        "name":"Tic Tac Vato",
+        "url":"https://vato.sqmu.io/index.html",
+        "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
+        "splashBackgroundColor":"#FF6B00"
+      }
     }
-  }
-}' />
+  }' />
   <meta name="fc:frame" content='{
-  "version":"1",
-  "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
-  "button":{
-    "title":"Play Tic Tac Vato",
-    "action":{
-      "type":"launch_frame",
-      "name":"Tic Tac Vato",  
-      "url":"https://vato.sqmu.io/index.html",  
-      "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
-      "splashBackgroundColor":"#FF6B00"
+    "version":"1",
+    "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
+    "button":{
+      "title":"Play Tic Tac Vato",
+      "action":{
+        "type":"launch_frame",
+        "name":"Tic Tac Vato",
+        "url":"https://vato.sqmu.io/index.html",
+        "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
+        "splashBackgroundColor":"#FF6B00"
+      }
     }
-  }
-}' />
+  }' />
 
   <style>
     body { font-family: 'Courier New', monospace; max-width: 420px; margin: 0 auto; padding: 20px; background: #121212; color: #f0f0f0; }
@@ -56,8 +58,8 @@
   <div class="subtitle">Outwit the Code Cholo</div>
 
   <div class="panel" id="economy">
-    <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
-    <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">0.000010</span> ETH</strong></div></div>
+    <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">—</span> ETH</strong></div></div>
+    <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">—</span> ETH</strong></div></div>
     <div class="row"><div>📈 Target</div><div><strong>0.100000 ETH</strong></div></div>
     <small class="mono">When the pool hits 0.1 ETH, top 3 spenders win 40%, 30% and 20%. The pool then resets to 0.001 ETH.</small>
   </div>
@@ -77,13 +79,240 @@
     <div class="cell" data-index="8"></div>
   </div>
 
-  <div id="status">👉 Connect wallet to challenge the vato</div>
+  <div id="status">Loading on-chain state…</div>
 
   <div class="panel" id="leaderboard">
     <div class="row"><div>🏆 Top Spenders</div></div>
     <ol id="lbList"><li>—</li><li>—</li><li>—</li></ol>
   </div>
 
-  <!-- Mini App SDK via ESM CDN, as suggested by the guide -->
-  </body>
+  <script type="module">
+    import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+    import {
+      createPublicClient,
+      custom,
+      encodeFunctionData,
+      parseAbi,
+      waitForTransactionReceipt,
+    } from 'https://esm.sh/viem@2.9.32';
+
+    (async () => {
+      // Signal readiness early to clear splash in host
+      try { await sdk.actions.ready(); } catch {}
+
+      // EIP-1193 provider from Mini App
+      const provider = await sdk.wallet.getEthereumProvider();
+
+      // UI elements
+      const els = {
+        poolEth: document.getElementById('poolEth'),
+        feeEth:  document.getElementById('feeEth'),
+        connect: document.getElementById('connect'),
+        play:    document.getElementById('play'),
+        status:  document.getElementById('status'),
+        board:   document.getElementById('board'),
+        lbList:  document.getElementById('lbList'),
+      };
+
+      // Contract bindings
+      const CONTRACT_ADDR = '0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E';
+      const ABI = parseAbi([
+        'function prizePool() view returns (uint256)',
+        'function currentFee() view returns (uint256)',
+        'function getLeaderboard() view returns (address[3], uint256[3])',
+        'function previewPayouts() view returns (uint256,uint256,uint256,uint256)',
+        'function play() payable',
+      ]);
+      if (!provider || typeof provider.request !== 'function') {
+        els.status.textContent = 'Wallet provider missing. Open inside a Farcaster Mini App host.';
+        throw new Error('No EIP-1193 provider');
+      }
+      const pub = createPublicClient({ transport: custom(provider) });
+
+      // Chain helpers
+      const ARBITRUM_HEX = '0xa4b1';
+      async function onCorrectChain() {
+        try { return (await provider.request({ method: 'eth_chainId' })) === ARBITRUM_HEX; }
+        catch { return false; }
+      }
+
+      // Formatters
+      const ETH = 10n ** 18n;
+      const to6 = (wei) => {
+        const w = BigInt(wei);
+        const whole = w / ETH;
+        const frac  = ((w % ETH) * 1_000_000n) / ETH;
+        return `${whole}.${frac.toString().padStart(6, '0')}`;
+      };
+
+      // Reads
+      async function readPool() {
+        return pub.readContract({ address: CONTRACT_ADDR, abi: ABI, functionName: 'prizePool' });
+      }
+      async function readFee() {
+        return pub.readContract({ address: CONTRACT_ADDR, abi: ABI, functionName: 'currentFee' });
+      }
+      async function readLeaderboard() {
+        const [addrs, amts] = await pub.readContract({ address: CONTRACT_ADDR, abi: ABI, functionName: 'getLeaderboard' });
+        return { addrs, amts };
+      }
+
+      // UI refresh (no account needed)
+      async function refreshUI() {
+        if (!(await onCorrectChain())) {
+          els.status.textContent = 'Switch to Arbitrum One (42161) to load live pool.';
+          return;
+        }
+        try {
+          const [poolWei, feeWei, lb] = await Promise.all([readPool(), readFee(), readLeaderboard()]);
+          els.poolEth.textContent = to6(poolWei);
+          els.feeEth.textContent  = to6(feeWei);
+
+          const rows = [0,1,2].map(i => {
+            const a = lb.addrs[i];
+            const v = lb.amts[i];
+            if (!a || a.toLowerCase() === '0x0000000000000000000000000000000000000000' || v === 0n) return null;
+            return `<li>${a.slice(0,6)}…${a.slice(-4)} — ${to6(v)} ETH</li>`;
+          }).filter(Boolean);
+          els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
+          els.status.textContent = 'Connect wallet to play.';
+        } catch (e) {
+          console.error(e);
+          els.status.textContent = 'Failed to read on-chain state.';
+        }
+      }
+
+      // Wallet connect (then enforce chain)
+      let player = '';
+      els.connect.onclick = async () => {
+        try {
+          await provider.request({ method: 'eth_requestAccounts' });
+          const accounts = await provider.request({ method: 'eth_accounts' });
+          player = accounts[0] || '';
+          if (!player) return;
+
+          // Enforce Arbitrum after account connection
+          const chainId = await provider.request({ method: 'eth_chainId' });
+          if (chainId !== ARBITRUM_HEX) {
+            await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
+          }
+
+          els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
+          els.connect.style.background = '#4CAF50';
+          els.play.disabled = false;
+          els.status.textContent = 'Ready. Pay to play.';
+          await refreshUI();
+        } catch (e) {
+          console.error(e);
+          els.status.textContent = e?.message || 'Wallet connection failed.';
+        }
+      };
+
+      // --- Tic-tac-toe game logic (unchanged) ---
+      let board = ["","","","","","","","",""];
+      let gameActive = false;
+      const cells = [...document.querySelectorAll('.cell')];
+
+      cells.forEach(c => c.addEventListener('click', e => {
+        if (!gameActive) return;
+        const i = +e.currentTarget.dataset.index;
+        if (board[i] !== "") return;
+        board[i] = "X";
+        e.currentTarget.textContent = "X";
+        e.currentTarget.classList.add('x');
+        if (checkEnd()) return;
+        vatoMove();
+      }));
+
+      function checkEnd() {
+        const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        let win = null;
+        for (const [a,b,c] of W) if (board[a] && board[a]===board[b] && board[a]===board[c]) { win = board[a]; break; }
+        if (win || !board.includes("")) {
+          gameActive = false;
+          if (win === "X") els.status.innerHTML = "🎉 <strong>You won!</strong>";
+          else if (win === "O") els.status.innerHTML = "💀 <strong>Vato smoked you!</strong> Pay to try again";
+          else els.status.innerHTML = "🤝 <strong>Draw</strong>";
+          els.play.style.display = "block";
+          return true;
+        }
+        return false;
+      }
+      function minimax(board, player) {
+        const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        const opp = player === "X" ? "O" : "X";
+        for (const [i, j, k] of W)
+          if (board[i] && board[i] === board[j] && board[i] === board[k])
+            return { score: board[i] === "O" ? 10 : -10 };
+        if (!board.includes("")) return { score: 0 };
+        const moves = [];
+        for (let idx = 0; idx < 9; idx++) if (board[idx] === "") {
+          board[idx] = player;
+          const result = minimax(board, opp);
+          moves.push({ index: idx, score: result.score });
+          board[idx] = "";
+        }
+        return (player === "O")
+          ? moves.reduce((best, x) => x.score > best.score ? x : best, moves[0])
+          : moves.reduce((best, x) => x.score < best.score ? x : best, moves[0]);
+      }
+      function vatoMove() {
+        els.status.innerHTML = "🤔 <strong>Vato thinking…</strong>";
+        setTimeout(()=>{
+          const m = minimax([...board], "O");
+          board[m.index]="O";
+          const cell = document.querySelector(`.cell[data-index="${m.index}"]`);
+          cell.textContent="O"; cell.classList.add('o');
+          checkEnd();
+        }, 600);
+      }
+      function resetBoard() {
+        board = ["","","","","","","","",""];
+        cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
+      }
+
+      // On-chain Pay & Play
+      async function onPlay() {
+        try {
+          // Ensure we’re on the right chain and have an account
+          const okChain = await onCorrectChain();
+          if (!okChain) {
+            await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
+          }
+          const accounts = await provider.request({ method: 'eth_accounts' });
+          const from = accounts?.[0];
+          if (!from) throw new Error('No wallet account connected.');
+
+          // Read current fee and call play()
+          const feeWei = await readFee();
+          els.status.innerHTML = `⏳ <strong>Paying ${to6(feeWei)} ETH…</strong>`;
+
+          const data = encodeFunctionData({ abi: ABI, functionName: 'play', args: [] });
+          const txHash = await provider.request({
+            method: 'eth_sendTransaction',
+            params: [{ from, to: CONTRACT_ADDR, data, value: '0x' + BigInt(feeWei).toString(16) }],
+          });
+
+          await waitForTransactionReceipt(pub, { hash: txHash });
+          await refreshUI();
+
+          resetBoard();
+          gameActive = true;
+          els.board.style.display = "grid";
+          els.play.style.display = "none";
+          els.status.innerHTML = "🔫 <strong>Your move</strong> (You're X)";
+        } catch (err) {
+          console.error(err);
+          els.status.innerHTML = `❌ <strong>Error:</strong> ${err?.message || err}`;
+        }
+      }
+
+      els.play.onclick = onPlay;
+
+      // Initial load + periodic refresh
+      refreshUI();
+      setInterval(refreshUI, 8000);
+    })();
+  </script>
+</body>
 </html>
