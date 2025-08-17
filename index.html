@@ -106,14 +106,7 @@
         }
       }
 
-      const CONTRACT_ADDRESS = '0xYourContractAddress';
-      const ABI = [
-        'function prizePool() view returns (uint256)',
-        'function currentFee() view returns (uint256)',
-        'function getLeaderboard() view returns (address[3], uint256[3])',
-        'function play() payable',
-        'function getConfig() view returns (uint256 minPool, uint256 maxPool, uint16 feeBps)'
-      ];
+      const { address: CONTRACT_ADDRESS, abi: ABI } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json());
       const ethersProvider = new ethers.BrowserProvider(provider);
       const signer = await ethersProvider.getSigner();
       const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
