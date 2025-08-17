@@ -101,27 +101,32 @@
         // Signal readiness as soon as minimal DOM is rendered
         sdk.actions.ready().catch(() => {});
 
-        // EIP-1193 provider from Mini App
-        const provider = await sdk.wallet.getEthereumProvider();
+        // UI elements
+        const els = {
+          poolEth: document.getElementById('poolEth'),
+          feeEth:  document.getElementById('feeEth'),
+          connect: document.getElementById('connect'),
+          play:    document.getElementById('play'),
+          status:  document.getElementById('status'),
+          board:   document.getElementById('board'),
+          lbList:  document.getElementById('lbList'),
+        };
 
-      // UI elements
-      const els = {
-        poolEth: document.getElementById('poolEth'),
-        feeEth:  document.getElementById('feeEth'),
-        connect: document.getElementById('connect'),
-        play:    document.getElementById('play'),
-        status:  document.getElementById('status'),
-        board:   document.getElementById('board'),
-        lbList:  document.getElementById('lbList'),
-      };
-
-      // Contract bindings
-      const { address: CONTRACT_ADDR, abi: ABI } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json());
-      if (!provider || typeof provider.request !== 'function') {
-        els.status.textContent = 'Wallet provider missing. Open inside a Farcaster Mini App host.';
-        throw new Error('No EIP-1193 provider');
-      }
-      const pub = createPublicClient({ transport: custom(provider) });
+        // Provider & ABI
+        let provider, CONTRACT_ADDR, ABI;
+        try {
+          provider = await sdk.wallet.getEthereumProvider();
+          ({ address: CONTRACT_ADDR, abi: ABI } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json()));
+          if (!provider || typeof provider.request !== 'function') {
+            throw new Error('No EIP-1193 provider');
+          }
+        } catch (e) {
+          console.error(e);
+          els.status.textContent = 'Failed to load wallet or contract data.';
+          await sdk.actions.ready().catch(() => {});
+          return;
+        }
+        const pub = createPublicClient({ transport: custom(provider) });
 
       // Chain helpers
       const ARBITRUM_HEX = '0xa4b1';
