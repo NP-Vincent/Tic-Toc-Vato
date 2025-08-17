@@ -2,12 +2,12 @@
   "frame": {
     "name": "Tic Toc Vato",
     "version": "1",
-    "iconUrl": "https://np-vincent.github.io/Tic-Toc-Vato/assets/icon.jpg",
-    "homeUrl": "https://https://np-vincent.github.io/Tic-Toc-Vato/",
-    "imageUrl": "https://np-vincent.github.io/Tic-Toc-Vato/assets/og.jpg",
-    "splashImageUrl": "https://np-vincent.github.io/Tic-Toc-Vato/assets/og.jpg",
+    "iconUrl": "https://vato.sqmu.io/assets/icon.jpg",
+    "homeUrl": "https://vato.sqmu.io",
+    "imageUrl": "https://vato.sqmu.io/assets/og.jpg",
+    "splashImageUrl": "https://vato.sqmu.io/assets/og.jpg",
     "splashBackgroundColor": "#FF6B00",
-    "webhookUrl": "https://https://np-vincent.github.io/Tic-Toc-Vato//api/webhook",
+    "webhookUrl": "https://vato.sqmu.io/api/webhook",
     "subtitle": "Outwit the Code Cholo",
     "description": "Tic Tac Vato, How Good Are You?",
     "primaryCategory": "games"
