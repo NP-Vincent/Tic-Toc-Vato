@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🕶️ Tic Tac Vato — Minimal</title>
+  <meta name="fc:miniapp" content='{
+  "version":"1",
+  "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
+  "button":{
+    "title":"Play Tic Tac Vato",
+    "action":{
+      "type":"launch_frame",
+      "name":"Tic Tac Vato",                      <!-- Required -->
+      "url":"https://vato.sqmu.io/index.html",
+      "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
+      "splashBackgroundColor":"#FF6B00"
+    }
+  }
+}' />
+  <meta name="fc:frame" content='{
+  "version":"1",
+  "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
+  "button":{
+    "title":"Play Tic Tac Vato",
+    "action":{
+      "type":"launch_frame",
+      "name":"Tic Tac Vato",  <!-- Required -->
+      "url":"https://vato.sqmu.io/index.html",  <!-- Required -->
+      "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
+      "splashBackgroundColor":"#FF6B00"
+    }
+  }
+}' />
+
+  <style>
+    body { font-family: 'Courier New', monospace; max-width: 420px; margin: 0 auto; padding: 20px; background: #121212; color: #f0f0f0; }
+    h1 { color: #FF6B00; text-align: center; font-size: 2.2rem; margin: 6px 0 2px; text-shadow: 2px 2px 4px #000; }
+    .subtitle { text-align: center; color: #aaa; margin-bottom: 18px; }
+    #board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 18px 0; background: #1E1E1E; padding: 10px; border-radius: 10px; box-shadow: 0 0 15px rgba(0,0,0,.5); }
+    .cell { aspect-ratio: 1; background: #2A2A2A; border: 2px solid #FF6B00; display: flex; align-items: center; justify-content: center; font-size: 3rem; cursor: pointer; transition: all .2s; }
+    .cell:hover { background: #333; transform: scale(1.04); }
+    .cell.x { color: #4CAF50; } .cell.o { color: #F44336; }
+    #status { font-weight: bold; margin: 12px 0; text-align: center; min-height: 40px; }
+    .panel { background: #1E1E1E; padding: 10px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #FF6B00; }
+    .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+    button { background: linear-gradient(135deg, #FF6B00 0%, #FF9500 100%); color: #fff; border: 0; padding: 12px 16px; border-radius: 8px; cursor: pointer; font-weight: 700; width: 100%; transition: transform .1s, box-shadow .1s; }
+    button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(255,107,0,.35); }
+    button:disabled { background: #555; cursor: not-allowed; box-shadow: none; }
+    #leaderboard ol { padding-left: 20px; margin: 8px 0 0; }
+    small.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #bbb; }
+  </style>
+</head>
+<body>
+  <h1>TIC TAC VATO</h1>
+  <div class="subtitle">Outwit the Code Cholo</div>
+
+  <div class="panel" id="economy">
+    <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
+    <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">0.000010</span> ETH</strong></div></div>
+    <div class="row"><div>📈 Target</div><div><strong>0.100000 ETH</strong></div></div>
+    <small class="mono">When the pool hits 0.1 ETH, top 3 spenders win 40%, 30% and 20%. The pool then resets to 0.001 ETH.</small>
+  </div>
+
+  <div class="row"><button id="connect">🔓 Connect Wallet</button></div>
+  <div class="row"><button id="play" disabled>💸 Pay & Play</button></div>
+
+  <div id="board" style="display:none;">
+    <div class="cell" data-index="0"></div>
+    <div class="cell" data-index="1"></div>
+    <div class="cell" data-index="2"></div>
+    <div class="cell" data-index="3"></div>
+    <div class="cell" data-index="4"></div>
+    <div class="cell" data-index="5"></div>
+    <div class="cell" data-index="6"></div>
+    <div class="cell" data-index="7"></div>
+    <div class="cell" data-index="8"></div>
+  </div>
+
+  <div id="status">👉 Connect wallet to challenge the vato</div>
+
+  <div class="panel" id="leaderboard">
+    <div class="row"><div>🏆 Top Spenders</div></div>
+    <ol id="lbList"><li>—</li><li>—</li><li>—</li></ol>
+  </div>
+
+  <!-- Mini App SDK via ESM CDN, as suggested by the guide -->
+  <script type="module">
+    import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+
+    // Wrap startup in an async function for wider compatibility
+    (async () => {
+      // Display the app (hide host splash) once ready — critical per guide
+      await sdk.actions.ready();
+
+      // Get EIP-1193 provider from the Mini App SDK (no ethers)
+      const provider = await sdk.wallet.getEthereumProvider();
+
+      // Enforce Arbitrum One (42161)
+      const ARBITRUM_HEX = '0xa4b1';
+      let chainId = await provider.request({ method: 'eth_chainId' });
+      if (chainId !== ARBITRUM_HEX) {
+        try {
+          await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
+          chainId = ARBITRUM_HEX;
+        } catch (e) {
+          document.getElementById('status').textContent = 'Please switch to Arbitrum One (42161).';
+          throw e;
+        }
+      }
+
+      // Elements
+      const els = {
+        poolEth: document.getElementById('poolEth'),
+        feeEth: document.getElementById('feeEth'),
+        connect: document.getElementById('connect'),
+        play: document.getElementById('play'),
+        status: document.getElementById('status'),
+        board: document.getElementById('board'),
+        lbList: document.getElementById('lbList')
+      };
+
+    // Economy in wei (BigInt); ETH = 1e18 wei
+    const ETH = 10n ** 18n;
+    const MIN_POOL = ETH / 1000n; // 0.001 ETH
+    const MAX_POOL = ETH / 10n;   // 0.1   ETH
+    let pool = MIN_POOL;
+
+    // Track top spenders (address → total spent in wei)
+    const spendMap = new Map();
+
+    function fmtEth(wei) {
+      // format to 6 dp without floating errors
+      const whole = wei / ETH;
+      const frac = ((wei % ETH) * 1_000_000n) / ETH; // 6 dp
+      return `${whole}.${frac.toString().padStart(6, '0')}`;
+    }
+    function feeFromPool(p) { return p / 100n; } // 1%
+
+    function updateEconomyUI() {
+      els.poolEth.textContent = fmtEth(pool);
+      els.feeEth.textContent = fmtEth(feeFromPool(pool));
+    }
+    function updateLeaderboardUI() {
+      const rows = [...spendMap.entries()]
+        .sort((a,b)=> (a[1] < b[1] ? 1 : -1))
+        .slice(0,3)
+        .map(([addr, wei], i) => {
+          const pct = [40,30,20][i] ?? 0;
+          return `<li>${addr.slice(0,6)}…${addr.slice(-4)} — ${fmtEth(wei)} ETH (eligible ${pct}%)</li>`;
+        });
+      els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
+    }
+    updateEconomyUI(); updateLeaderboardUI();
+
+    // Wallet connect
+    let player = '';
+    els.connect.onclick = async () => {
+      await provider.request({ method: 'eth_requestAccounts' });
+      const accounts = await provider.request({ method: 'eth_accounts' });
+      player = accounts[0] || '';
+      if (!player) return;
+      els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
+      els.connect.style.background = '#4CAF50';
+      els.play.disabled = false;
+      els.status.innerHTML = '🕶️ <strong>Vato ready!</strong> Pay to play';
+    };
+
+    // Tic-tac-toe
+    let board = ["","","","","","","","",""];
+    let gameActive = false;
+    const cells = [...document.querySelectorAll('.cell')];
+
+    cells.forEach(c => c.addEventListener('click', e => {
+      if (!gameActive) return;
+      const i = +e.currentTarget.dataset.index;
+      if (board[i] !== "") return;
+      board[i] = "X";
+      e.currentTarget.textContent = "X";
+      e.currentTarget.classList.add('x');
+      if (checkEnd()) return;
+      vatoMove();
+    }));
+
+    function checkEnd() {
+      const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      let win = null;
+      for (const [a,b,c] of W) if (board[a] && board[a]===board[b] && board[a]===board[c]) { win = board[a]; break; }
+      if (win || !board.includes("")) {
+        gameActive = false;
+        if (win === "X") els.status.innerHTML = "🎉 <strong>You won!</strong>";
+        else if (win === "O") els.status.innerHTML = "💀 <strong>Vato smoked you!</strong> Pay to try again";
+        else els.status.innerHTML = "🤝 <strong>Draw</strong>";
+        els.play.style.display = "block";
+        return true;
+      }
+      return false;
+    }
+    function minimax(board, player) {
+      const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+      const opp = player === "X" ? "O" : "X";
+      for (const [i, j, k] of W)
+        if (board[i] && board[i] === board[j] && board[i] === board[k])
+          return { score: board[i] === "O" ? 10 : -10 };
+      if (!board.includes("")) return { score: 0 };
+      const moves = [];
+      for (let idx = 0; idx < 9; idx++) if (board[idx] === "") {
+        board[idx] = player;
+        const result = minimax(board, opp);
+        moves.push({ index: idx, score: result.score });
+        board[idx] = "";
+      }
+      return (player === "O")
+        ? moves.reduce((best, x) => x.score > best.score ? x : best, moves[0])
+        : moves.reduce((best, x) => x.score < best.score ? x : best, moves[0]);
+    }
+    function vatoMove() {
+      els.status.innerHTML = "🤔 <strong>Vato thinking…</strong>";
+      setTimeout(()=>{
+        const m = minimax([...board], "O");
+        board[m.index]="O";
+        const cell = document.querySelector(`.cell[data-index="${m.index}"]`);
+        cell.textContent="O"; cell.classList.add('o');
+        checkEnd();
+      }, 600);
+    }
+    function resetBoard() {
+      board = ["","","","","","","","",""];
+      cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
+    }
+
+    // Payment + play
+    const HOUSE_WALLET = '0x8Db45f90ef4eBFC6D133C1b2c6ac742B2AE653Aa';
+    els.play.onclick = async () => {
+      try {
+        // Entry fee = 1% of current pool
+        const fee = feeFromPool(pool);
+        const toHouse = fee / 2n;         // 50% → house
+        const toPool  = fee - toHouse;    // 50% → pool (exact split)
+
+        els.status.innerHTML = `⏳ <strong>Paying ${fmtEth(fee)} ETH…</strong>`;
+
+        // One simple transfer to house wallet on Arbitrum
+        const txHash = await provider.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: player,
+            to: HOUSE_WALLET,
+            value: '0x' + toHouse.toString(16)
+          }]
+        });
+        // Optional: poll for receipt if you want confirmation UI (omitted for minimalism)
+
+        // Update pool locally
+        pool = pool + toPool;
+        if (pool > MAX_POOL) pool = MAX_POOL;
+        updateEconomyUI();
+
+        // Track spender for leaderboard
+        const prev = spendMap.get(player) || 0n;
+        spendMap.set(player, prev + fee);
+        updateLeaderboardUI();
+
+        // Start game
+        resetBoard();
+        gameActive = true;
+        els.board.style.display = "grid";
+        els.play.style.display = "none";
+        els.status.innerHTML = "🔫 <strong>Your move</strong> (You're X)";
+
+        // Payout trigger message
+        if (pool >= MAX_POOL) {
+          els.status.innerHTML += `<br>💰 <strong>PAYOUT TRIGGERED</strong> — 40/30/20% to top 3`;
+          pool = MIN_POOL; updateEconomyUI();
+          // spendMap.clear(); updateLeaderboardUI(); // optional reset
+        }
+      } catch (err) {
+        console.error(err);
+        els.status.innerHTML = `❌ <strong>Error:</strong> ${err.message || err}`;
+      }
+    };
+    })();
+  </script>
+</body>
+</html>
