@@ -16,7 +16,9 @@
       "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
       "splashBackgroundColor":"#FF6B00"
     }
-  }
+  },
+  "requiredCapabilities":["wallet.getEthereumProvider"],
+  "requiredChains":["eip155:42161"]
 }' />
   <meta name="fc:frame" content='{
   "version":"1",
@@ -30,7 +32,9 @@
       "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
       "splashBackgroundColor":"#FF6B00"
     }
-  }
+  },
+  "requiredCapabilities":["wallet.getEthereumProvider"],
+  "requiredChains":["eip155:42161"]
 }' />
 
   <style>
@@ -108,8 +112,8 @@
 
       const { address: CONTRACT_ADDRESS, abi: ABI } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json());
       const ethersProvider = new ethers.BrowserProvider(provider);
-      const signer = await ethersProvider.getSigner();
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, ethersProvider);
+      let contractWithSigner = null;
       let { maxPool: MAX_POOL } = await contract.getConfig();
 
       const els = {
@@ -144,10 +148,15 @@
         ).join('');
       }
 
+      await refreshEconomy();
+      await refreshLeaderboard();
+
       els.connect.onclick = async () => {
         const accounts = await provider.request({ method: 'eth_requestAccounts' });
         player = accounts[0];
         if (!player) return;
+        const signer = await ethersProvider.getSigner();
+        contractWithSigner = contract.connect(signer);
         els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
         els.connect.style.background = '#4CAF50';
         els.play.disabled = false;
@@ -222,7 +231,7 @@
         try {
           const fee = await contract.currentFee();
           els.status.innerHTML = `⏳ <strong>Paying ${fmtEth(fee)} ETH…</strong>`;
-          const tx = await contract.play({ value: fee });
+          const tx = await contractWithSigner.play({ value: fee });
           await tx.wait();
           const poolWei = await refreshEconomy();
           await refreshLeaderboard();
