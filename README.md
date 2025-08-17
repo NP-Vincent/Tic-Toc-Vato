@@ -29,7 +29,15 @@ A minimalist Farcaster Mini App that lets users play Tic Tac Toe ("Tic Tac Vato"
 - Implementation: `0xA82ad49C77160D09F49c6f5fDf35d3000685b624`
 - ABI: `abi/TicTacVatoPrizePool.json`
 
-`index.html` fetches the ABI and contract address from the JSON file above. Update it if the contract redeploys or the domain changes.
+`index.html` loads the contract address and ABI at runtime by fetching `abi/TicTacVatoPrizePool.json`. If the contract redeploys or the domain changes, update this JSON file rather than hard-coding values.
+
+---
+
+## Farcaster integration
+
+- The site serves `/.well-known/farcaster.json` using the `miniapp` schema. It declares `requiredChains` with `eip155:42161` and lists the required capabilities the client expects (e.g., `wallet.getEthereumProvider`, `actions.ready`).
+- `index.html` embeds `fc:miniapp` meta tags so Frames can launch the app via `launch_miniapp` and includes `fc:miniapp:domain` to reference the hosting domain.
+- After the UI has rendered, the client calls `sdk.actions.ready()` to signal that the app has finished loading.
 
 ---
 
