@@ -14,13 +14,13 @@ This file is intended for AI agents (e.g. GitHub Copilot, ChatGPT / Codex) that 
 
 2. **Assist project tasks** such as:
    - Updating `index.html` to match guidance (e.g., manifest embed, meta tags, capabilities)
-   - Generating the `/.well-known/farcaster.json` manifest
-   - Creating metadata like app icons, OpenGraph tags, `fc:miniapp` embed meta
+   - Generating the `/.well-known/farcaster.json` manifest using the `miniapp` schema with required fields and optional `requiredChains`/`requiredCapabilities`
+   - Creating metadata like app icons, OpenGraph tags, and `fc:miniapp` embeds that use `launch_miniapp` and include `fc:miniapp:domain`
    - Suggesting improvements for UX, Discoverability, Testing
-   - Ensuring `sdk.actions.ready()` is used correctly, and other best practices
+   - Ensuring `sdk.actions.ready()` fires after the UI has loaded, and other best practices
    - Maintaining the `contracts/` directory and keeping `index.html` in sync with the deployed contract address
    - The prize pool contract is currently deployed at `0xA82ad49C77160D09F49c6f5fDf35d3000685b624` with proxy `0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E`
-   - `index.html` loads its ABI and address from `abi/TicTacVatoPrizePool.json`; update this file if redeploying
+   - `index.html` fetches its ABI and contract address from `abi/TicTacVatoPrizePool.json`; update this JSON if redeploying
    - The public site is hosted at `https://vato.sqmu.io`
 
 3. **Prompt the user with context-based questions**, **only referencing the docs** and not quoting from them verbatim. Example prompts:
@@ -34,7 +34,7 @@ This file is intended for AI agents (e.g. GitHub Copilot, ChatGPT / Codex) that 
 - **Import the full spec** via `llms-full.txt` into your context. This document is formatted for LLM consumption. ([source](https://miniapps.farcaster.xyz/llms-full.txt))  
 - **When providing edits or suggestions**, do **not quote** from the docs. Instead, phrase references like:
   - “According to the Getting Started guide, you must call `sdk.actions.ready()` after your UI loads to avoid infinite loading screens.”
-  - “The manifest requires `requiredChains` and `requiredCapabilities` fields so the Farcaster host can properly enable the app.”
+  - “The manifest uses the `miniapp` schema and may include `requiredChains` or `requiredCapabilities` if the app needs them.”
 
 - **Only ask follow-up questions** if clarity is needed, and phrase them around the doc:
   - Example: “Should we declare `requiredChains: ["eip155:42161"]` in the manifest as recommended by the Farcaster Publishing guide?”
