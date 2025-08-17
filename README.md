@@ -12,10 +12,12 @@ A minimalist Farcaster Mini App that lets users play Tic Tac Toe ("Tic Tac Vato"
   - **Fee:** 1% of current pool; 50% to house wallet, 50% to pool
   - **Payout trigger:** at 0.1 ETH, displays top-3 spenders (40/30/20%)
 - **LLM-friendly**: includes navigation for Codex/AI agent assistance using Farcaster's `llms-full.txt`
+- **Admin panel**: `admin.html` lets the contract owner seed or fund the pool and change the house wallet
 
 ## Contents
 
 - `index.html`: Minimal Mini App implementation with contract calls
+- `admin.html`: Owner interface for funding the prize pool and updating settings
 - `contracts/TicTacVatoPrizePool.sol`: Prize pool smart contract
 - `README.md`: This file
 - `AGENTS.md`: Instructions for interacting with the repo using AI agents
