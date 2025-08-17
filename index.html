@@ -88,36 +88,38 @@
   <script type="module">
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
 
-    // Display the app (hide host splash) once ready — critical per guide
-    await sdk.actions.ready();  // If omitted, you’ll see an infinite loader. :contentReference[oaicite:1]{index=1}
+    // Wrap startup in an async function for wider compatibility
+    (async () => {
+      // Display the app (hide host splash) once ready — critical per guide
+      await sdk.actions.ready();
 
-    // Get EIP-1193 provider from the Mini App SDK (no ethers)
-    const provider = await sdk.wallet.getEthereumProvider(); // EVM-only app here. :contentReference[oaicite:2]{index=2}
+      // Get EIP-1193 provider from the Mini App SDK (no ethers)
+      const provider = await sdk.wallet.getEthereumProvider();
 
-    // Enforce Arbitrum One (42161)
-    const ARBITRUM_HEX = '0xa4b1';
-    let chainId = await provider.request({ method: 'eth_chainId' });
-    if (chainId !== ARBITRUM_HEX) {
-      try {
-        await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
-        chainId = ARBITRUM_HEX;
-      } catch (e) {
-        document.getElementById('status').textContent = 'Please switch to Arbitrum One (42161).';
-        throw e;
+      // Enforce Arbitrum One (42161)
+      const ARBITRUM_HEX = '0xa4b1';
+      let chainId = await provider.request({ method: 'eth_chainId' });
+      if (chainId !== ARBITRUM_HEX) {
+        try {
+          await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
+          chainId = ARBITRUM_HEX;
+        } catch (e) {
+          document.getElementById('status').textContent = 'Please switch to Arbitrum One (42161).';
+          throw e;
+        }
       }
-    }
 
-    // Elements
-    const els = {
-      poolEth: document.getElementById('poolEth'),
-      feeEth: document.getElementById('feeEth'),
-      connect: document.getElementById('connect'),
-      play: document.getElementById('play'),
-      status: document.getElementById('status'),
-      board: document.getElementById('board'),
-      lbList: document.getElementById('lbList'),
-      resetLb: document.getElementById('resetLb'),
-    };
+      // Elements
+      const els = {
+        poolEth: document.getElementById('poolEth'),
+        feeEth: document.getElementById('feeEth'),
+        connect: document.getElementById('connect'),
+        play: document.getElementById('play'),
+        status: document.getElementById('status'),
+        board: document.getElementById('board'),
+        lbList: document.getElementById('lbList'),
+        resetLb: document.getElementById('resetLb'),
+      };
 
     // Economy in wei (BigInt); ETH = 1e18 wei
     const ETH = 10n ** 18n;
@@ -281,6 +283,7 @@
 
     // Demo leaderboard reset
     els.resetLb.onclick = () => { spendMap.clear(); updateLeaderboardUI(); };
+    })();
   </script>
 </body>
 </html>
