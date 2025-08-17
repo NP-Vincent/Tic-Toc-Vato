@@ -55,12 +55,12 @@
   <h1>TIC TAC VATO</h1>
   <div class="subtitle">Outwit the Code Cholo</div>
 
-  <div class="panel" id="economy">
-    <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
-    <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">0.000010</span> ETH</strong></div></div>
-    <div class="row"><div>📈 Target</div><div><strong>0.100000 ETH</strong></div></div>
-    <small class="mono">When the pool hits 0.1 ETH, top 3 spenders win 40%, 30% and 20%. The pool then resets to 0.001 ETH.</small>
-  </div>
+    <div class="panel" id="economy">
+      <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
+      <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">0.000010</span> ETH</strong></div></div>
+      <div class="row"><div>📈 Target</div><div><strong><span id="targetEth">0.100000</span> ETH</strong></div></div>
+      <small class="mono">When the pool hits 0.1 ETH, top 3 spenders win 40%, 30% and 20%. The pool then resets to 0.001 ETH.</small>
+    </div>
 
   <div class="row"><button id="connect">🔓 Connect Wallet</button></div>
   <div class="row"><button id="play" disabled>💸 Pay & Play</button></div>
@@ -85,8 +85,9 @@
   </div>
 
   <!-- Mini App SDK via ESM CDN, as suggested by the guide -->
-  <script type="module">
-    import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+    <script type="module">
+      import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+      import { Interface } from 'https://esm.sh/ethers@6';
 
     // Wrap startup in an async function for wider compatibility
     (async () => {
@@ -109,49 +110,64 @@
         }
       }
 
-      // Elements
-      const els = {
-        poolEth: document.getElementById('poolEth'),
-        feeEth: document.getElementById('feeEth'),
-        connect: document.getElementById('connect'),
-        play: document.getElementById('play'),
-        status: document.getElementById('status'),
-        board: document.getElementById('board'),
-        lbList: document.getElementById('lbList')
-      };
+        // Load prize pool contract ABI + address
+        const { abi, address: CONTRACT } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json());
+        const iface = new Interface(abi);
 
-    // Economy in wei (BigInt); ETH = 1e18 wei
-    const ETH = 10n ** 18n;
-    const MIN_POOL = ETH / 1000n; // 0.001 ETH
-    const MAX_POOL = ETH / 10n;   // 0.1   ETH
-    let pool = MIN_POOL;
+        // Elements
+        const els = {
+          poolEth: document.getElementById('poolEth'),
+          feeEth: document.getElementById('feeEth'),
+          targetEth: document.getElementById('targetEth'),
+          connect: document.getElementById('connect'),
+          play: document.getElementById('play'),
+          status: document.getElementById('status'),
+          board: document.getElementById('board'),
+          lbList: document.getElementById('lbList')
+        };
 
-    // Track top spenders (address → total spent in wei)
-    const spendMap = new Map();
+        // Config from contract
+        const cfgData = iface.encodeFunctionData('getConfig');
+        const cfgRaw = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: cfgData }, 'latest'] });
+        const [MIN_POOL, MAX_POOL/*, feeBps*/] = iface.decodeFunctionResult('getConfig', cfgRaw).map(x => BigInt(x));
+        const ETH = 10n ** 18n;
 
-    function fmtEth(wei) {
-      // format to 6 dp without floating errors
-      const whole = wei / ETH;
-      const frac = ((wei % ETH) * 1_000_000n) / ETH; // 6 dp
-      return `${whole}.${frac.toString().padStart(6, '0')}`;
-    }
-    function feeFromPool(p) { return p / 100n; } // 1%
+        function fmtEth(wei) {
+          const whole = wei / ETH;
+          const frac = ((wei % ETH) * 1_000_000n) / ETH;
+          return `${whole}.${frac.toString().padStart(6, '0')}`;
+        }
 
-    function updateEconomyUI() {
-      els.poolEth.textContent = fmtEth(pool);
-      els.feeEth.textContent = fmtEth(feeFromPool(pool));
-    }
-    function updateLeaderboardUI() {
-      const rows = [...spendMap.entries()]
-        .sort((a,b)=> (a[1] < b[1] ? 1 : -1))
-        .slice(0,3)
-        .map(([addr, wei], i) => {
-          const pct = [40,30,20][i] ?? 0;
-          return `<li>${addr.slice(0,6)}…${addr.slice(-4)} — ${fmtEth(wei)} ETH (eligible ${pct}%)</li>`;
-        });
-      els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
-    }
-    updateEconomyUI(); updateLeaderboardUI();
+        let pool = 0n;
+        let fee = 0n;
+
+        async function updateEconomyUI() {
+          const poolData = iface.encodeFunctionData('prizePool');
+          const rawPool = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: poolData }, 'latest'] });
+          pool = BigInt(rawPool);
+          const feeData = iface.encodeFunctionData('currentFee');
+          const rawFee = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: feeData }, 'latest'] });
+          fee = BigInt(rawFee);
+          els.poolEth.textContent = fmtEth(pool);
+          els.feeEth.textContent = fmtEth(fee);
+          els.targetEth.textContent = fmtEth(MAX_POOL);
+        }
+
+        async function updateLeaderboardUI() {
+          const lbData = iface.encodeFunctionData('getLeaderboard');
+          const raw = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: lbData }, 'latest'] });
+          const [addrs, amts] = iface.decodeFunctionResult('getLeaderboard', raw);
+          const rows = addrs.map((addr, i) => ({ addr, amt: BigInt(amts[i]) }))
+            .filter(x => x.addr !== '0x0000000000000000000000000000000000000000' && x.amt > 0n)
+            .map((x, i) => {
+              const pct = [40,30,20][i] ?? 0;
+              return `<li>${x.addr.slice(0,6)}…${x.addr.slice(-4)} — ${fmtEth(x.amt)} ETH (eligible ${pct}%)</li>`;
+            });
+          els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
+        }
+
+        await updateEconomyUI();
+        await updateLeaderboardUI();
 
     // Wallet connect
     let player = '';
@@ -229,56 +245,35 @@
       cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
     }
 
-    // Payment + play
-    const HOUSE_WALLET = '0x8Db45f90ef4eBFC6D133C1b2c6ac742B2AE653Aa';
-    els.play.onclick = async () => {
-      try {
-        // Entry fee = 1% of current pool
-        const fee = feeFromPool(pool);
-        const toHouse = fee / 2n;         // 50% → house
-        const toPool  = fee - toHouse;    // 50% → pool (exact split)
+      // Payment + play using prize pool contract
+      els.play.onclick = async () => {
+        try {
+          await updateEconomyUI();
+          els.status.innerHTML = `⏳ <strong>Paying ${fmtEth(fee)} ETH…</strong>`;
+          const data = iface.encodeFunctionData('play');
+          const txHash = await provider.request({
+            method: 'eth_sendTransaction',
+            params: [{
+              from: player,
+              to: CONTRACT,
+              data,
+              value: '0x' + fee.toString(16)
+            }]
+          });
 
-        els.status.innerHTML = `⏳ <strong>Paying ${fmtEth(fee)} ETH…</strong>`;
+          await updateEconomyUI();
+          await updateLeaderboardUI();
 
-        // One simple transfer to house wallet on Arbitrum
-        const txHash = await provider.request({
-          method: 'eth_sendTransaction',
-          params: [{
-            from: player,
-            to: HOUSE_WALLET,
-            value: '0x' + toHouse.toString(16)
-          }]
-        });
-        // Optional: poll for receipt if you want confirmation UI (omitted for minimalism)
-
-        // Update pool locally
-        pool = pool + toPool;
-        if (pool > MAX_POOL) pool = MAX_POOL;
-        updateEconomyUI();
-
-        // Track spender for leaderboard
-        const prev = spendMap.get(player) || 0n;
-        spendMap.set(player, prev + fee);
-        updateLeaderboardUI();
-
-        // Start game
-        resetBoard();
-        gameActive = true;
-        els.board.style.display = "grid";
-        els.play.style.display = "none";
-        els.status.innerHTML = "🔫 <strong>Your move</strong> (You're X)";
-
-        // Payout trigger message
-        if (pool >= MAX_POOL) {
-          els.status.innerHTML += `<br>💰 <strong>PAYOUT TRIGGERED</strong> — 40/30/20% to top 3`;
-          pool = MIN_POOL; updateEconomyUI();
-          // spendMap.clear(); updateLeaderboardUI(); // optional reset
+          resetBoard();
+          gameActive = true;
+          els.board.style.display = "grid";
+          els.play.style.display = "none";
+          els.status.innerHTML = "🔫 <strong>Your move</strong> (You're X)";
+        } catch (err) {
+          console.error(err);
+          els.status.innerHTML = `❌ <strong>Error:</strong> ${err.message || err}`;
         }
-      } catch (err) {
-        console.error(err);
-        els.status.innerHTML = `❌ <strong>Error:</strong> ${err.message || err}`;
-      }
-    };
+      };
     })();
   </script>
 </body>
