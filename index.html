@@ -98,6 +98,9 @@
 
     (async () => {
       try {
+        // Signal readiness as soon as minimal DOM is rendered
+        sdk.actions.ready().catch(() => {});
+
         // EIP-1193 provider from Mini App
         const provider = await sdk.wallet.getEthereumProvider();
 
