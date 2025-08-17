@@ -97,9 +97,6 @@
     } from 'https://esm.sh/viem@2.9.32';
 
     (async () => {
-      // Signal readiness early to clear splash in host
-      try { await sdk.actions.ready(); } catch {}
-
       // EIP-1193 provider from Mini App
       const provider = await sdk.wallet.getEthereumProvider();
 
@@ -303,9 +300,13 @@
       els.play.onclick = onPlay;
 
       // Initial load + periodic refresh
-      refreshUI();
+      await refreshUI();
       setInterval(refreshUI, 8000);
-    })();
+    } finally {
+      // Signal to host that rendering has completed
+      try { await sdk.actions.ready(); } catch {}
+    }
+  })();
   </script>
 </body>
 </html>
