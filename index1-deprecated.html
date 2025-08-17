@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🕶️ Tic Tac Vato — Minimal</title>
 
-  <!-- Farcaster Mini App / Frame metadata (no comments inside JSON) -->
+  <!-- Farcaster Mini App metadata (no comments inside JSON) -->
   <meta name="fc:miniapp" content='{
     "version":"1",
     "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
     "button":{
       "title":"Play Tic Tac Vato",
       "action":{
-        "type":"launch_miniapp",
+        "type":"launch_frame",
         "name":"Tic Tac Vato",
         "url":"https://vato.sqmu.io/index.html",
         "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
@@ -20,7 +20,6 @@
       }
     }
   }' />
-  <meta name="fc:miniapp:domain" content="vato.sqmu.io" />
   <meta name="fc:frame" content='{
     "version":"1",
     "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
@@ -80,7 +79,7 @@
     <div class="cell" data-index="8"></div>
   </div>
 
-  <div id="status">Loading on-chain state…</div>
+  <div id="status">Tap “Connect Wallet” to load the live pool.</div>
 
   <div class="panel" id="leaderboard">
     <div class="row"><div>🏆 Top Spenders</div></div>
@@ -89,53 +88,38 @@
 
   <script type="module">
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
-    import {
-      createPublicClient,
-      custom,
-      encodeFunctionData,
-      waitForTransactionReceipt,
-    } from 'https://esm.sh/viem@2.9.32';
+    import { parseAbi, encodeFunctionData, decodeFunctionResult } from 'https://esm.sh/viem@2.9.32';
 
     (async () => {
-      try {
-        // Signal readiness as soon as minimal DOM is rendered
-        sdk.actions.ready().catch(() => {});
+      // Clear host splash ASAP
+      try { await sdk.actions.ready(); } catch {}
 
-        // UI elements
-        const els = {
-          poolEth: document.getElementById('poolEth'),
-          feeEth:  document.getElementById('feeEth'),
-          connect: document.getElementById('connect'),
-          play:    document.getElementById('play'),
-          status:  document.getElementById('status'),
-          board:   document.getElementById('board'),
-          lbList:  document.getElementById('lbList'),
-        };
-
-        // Provider & ABI
-        let provider, CONTRACT_ADDR, ABI;
-        try {
-          provider = await sdk.wallet.getEthereumProvider();
-          ({ address: CONTRACT_ADDR, abi: ABI } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json()));
-          if (!provider || typeof provider.request !== 'function') {
-            throw new Error('No EIP-1193 provider');
-          }
-        } catch (e) {
-          console.error(e);
-          els.status.textContent = 'Failed to load wallet or contract data.';
-          await sdk.actions.ready().catch(() => {});
-          return;
-        }
-        const pub = createPublicClient({ transport: custom(provider) });
-
-      // Chain helpers
-      const ARBITRUM_HEX = '0xa4b1';
-      async function onCorrectChain() {
-        try { return (await provider.request({ method: 'eth_chainId' })) === ARBITRUM_HEX; }
-        catch { return false; }
+      const provider = await sdk.wallet.getEthereumProvider();
+      if (!provider || typeof provider.request !== 'function') {
+        document.getElementById('status').textContent = 'Mini App wallet provider missing.';
+        throw new Error('No EIP-1193 provider');
       }
 
-      // Formatters
+      // UI
+      const els = {
+        poolEth: document.getElementById('poolEth'),
+        feeEth:  document.getElementById('feeEth'),
+        connect: document.getElementById('connect'),
+        play:    document.getElementById('play'),
+        status:  document.getElementById('status'),
+        board:   document.getElementById('board'),
+        lbList:  document.getElementById('lbList'),
+      };
+
+      // Chain / contract
+      const ARBITRUM_HEX = '0xa4b1';
+      const CONTRACT = '0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E';
+      const ABI = parseAbi([
+        'function prizePool() view returns (uint256)',
+        'function currentFee() view returns (uint256)',
+        'function getLeaderboard() view returns (address[3], uint256[3])',
+        'function play() payable'
+      ]);
       const ETH = 10n ** 18n;
       const to6 = (wei) => {
         const w = BigInt(wei);
@@ -144,44 +128,50 @@
         return `${whole}.${frac.toString().padStart(6, '0')}`;
       };
 
-      // Reads
-      async function readPool() {
-        return pub.readContract({ address: CONTRACT_ADDR, abi: ABI, functionName: 'prizePool' });
+      // Helpers
+      const isArbitrum = async () => (await provider.request({ method: 'eth_chainId' })) === ARBITRUM_HEX;
+
+      // Direct eth_call helpers (pure provider, no RPC URL)
+      async function ethCall(functionName, args = []) {
+        const data = encodeFunctionData({ abi: ABI, functionName, args });
+        return provider.request({
+          method: 'eth_call',
+          params: [{ to: CONTRACT, data }, 'latest']
+        });
       }
-      async function readFee() {
-        return pub.readContract({ address: CONTRACT_ADDR, abi: ABI, functionName: 'currentFee' });
+      async function readPrizePool() {
+        const raw = await ethCall('prizePool'); return BigInt(raw);
+      }
+      async function readCurrentFee() {
+        const raw = await ethCall('currentFee'); return BigInt(raw);
       }
       async function readLeaderboard() {
-        const [addrs, amts] = await pub.readContract({ address: CONTRACT_ADDR, abi: ABI, functionName: 'getLeaderboard' });
+        const raw = await ethCall('getLeaderboard');
+        const [addrs, amts] = decodeFunctionResult({ abi: ABI, functionName: 'getLeaderboard', data: raw });
         return { addrs, amts };
       }
 
-      // UI refresh (no account needed)
       async function refreshUI() {
-        if (!(await onCorrectChain())) {
-          els.status.textContent = 'Switch to Arbitrum One (42161) to load live pool.';
-          return;
-        }
+        const ok = await isArbitrum();
+        if (!ok) { els.status.textContent = 'Switching to Arbitrum…'; await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] }); }
         try {
-          const [poolWei, feeWei, lb] = await Promise.all([readPool(), readFee(), readLeaderboard()]);
+          const [poolWei, feeWei, lb] = await Promise.all([readPrizePool(), readCurrentFee(), readLeaderboard()]);
           els.poolEth.textContent = to6(poolWei);
           els.feeEth.textContent  = to6(feeWei);
-
           const rows = [0,1,2].map(i => {
-            const a = lb.addrs[i];
-            const v = lb.amts[i];
+            const a = lb.addrs[i], v = BigInt(lb.amts[i]);
             if (!a || a.toLowerCase() === '0x0000000000000000000000000000000000000000' || v === 0n) return null;
             return `<li>${a.slice(0,6)}…${a.slice(-4)} — ${to6(v)} ETH</li>`;
           }).filter(Boolean);
           els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
-          els.status.textContent = 'Connect wallet to play.';
+          els.status.textContent = 'Ready. Pay to play.';
         } catch (e) {
           console.error(e);
           els.status.textContent = 'Failed to read on-chain state.';
         }
       }
 
-      // Wallet connect (then enforce chain)
+      // Connect → switch chain → load state
       let player = '';
       els.connect.onclick = async () => {
         try {
@@ -190,16 +180,13 @@
           player = accounts[0] || '';
           if (!player) return;
 
-          // Enforce Arbitrum after account connection
-          const chainId = await provider.request({ method: 'eth_chainId' });
-          if (chainId !== ARBITRUM_HEX) {
+          if (!(await isArbitrum())) {
             await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
           }
 
           els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
           els.connect.style.background = '#4CAF50';
           els.play.disabled = false;
-          els.status.textContent = 'Ready. Pay to play.';
           await refreshUI();
         } catch (e) {
           console.error(e);
@@ -207,7 +194,7 @@
         }
       };
 
-      // --- Tic-tac-toe game logic (unchanged) ---
+      // --- Game logic (unchanged) ---
       let board = ["","","","","","","","",""];
       let gameActive = false;
       const cells = [...document.querySelectorAll('.cell')];
@@ -270,30 +257,47 @@
         cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
       }
 
-      // On-chain Pay & Play
+      // --- Pay & Play with fallback between methods ---
       async function onPlay() {
         try {
-          // Ensure we’re on the right chain and have an account
-          const okChain = await onCorrectChain();
-          if (!okChain) {
+          if (!(await isArbitrum())) {
             await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
           }
           const accounts = await provider.request({ method: 'eth_accounts' });
           const from = accounts?.[0];
           if (!from) throw new Error('No wallet account connected.');
 
-          // Read current fee and call play()
-          const feeWei = await readFee();
+          // Read fee
+          const feeWei = await readCurrentFee();
           els.status.innerHTML = `⏳ <strong>Paying ${to6(feeWei)} ETH…</strong>`;
 
+          // Encode play()
           const data = encodeFunctionData({ abi: ABI, functionName: 'play', args: [] });
-          const txHash = await provider.request({
-            method: 'eth_sendTransaction',
-            params: [{ from, to: CONTRACT_ADDR, data, value: '0x' + BigInt(feeWei).toString(16) }],
-          });
 
-          await waitForTransactionReceipt(pub, { hash: txHash });
-          await refreshUI();
+          // First try eth_sendTransaction (your original flow)
+          try {
+            await provider.request({
+              method: 'eth_sendTransaction',
+              params: [{ from, to: CONTRACT, data, value: '0x' + BigInt(feeWei).toString(16) }]
+            });
+          } catch (e) {
+            // If method unsupported, try EIP-5792 wallet_sendCalls
+            const msg = (e && (e.code === -32601 || /method|unsupported/i.test(String(e.message)))) ? 'fallback' : 'rethrow';
+            if (msg === 'fallback') {
+              await provider.request({
+                method: 'wallet_sendCalls',
+                params: [{
+                  from,
+                  calls: [{ to: CONTRACT, data, value: '0x' + BigInt(feeWei).toString(16) }]
+                }]
+              });
+            } else {
+              throw e;
+            }
+          }
+
+          // Give the host a tick to index, then refresh
+          setTimeout(refreshUI, 1500);
 
           resetBoard();
           gameActive = true;
@@ -308,13 +312,8 @@
 
       els.play.onclick = onPlay;
 
-      // Initial load + periodic refresh
-      await refreshUI();
-      setInterval(refreshUI, 8000);
-      } finally {
-        // Signal to host that rendering has completed
-        try { await sdk.actions.ready(); } catch {}
-      }
+      // Don’t read before connect (some hosts gate eth_call).
+      // After connect we switch chain and call refreshUI().
     })();
   </script>
 </body>
