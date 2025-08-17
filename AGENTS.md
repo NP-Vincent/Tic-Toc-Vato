@@ -8,7 +8,7 @@ This file is intended for AI agents (e.g. GitHub Copilot, ChatGPT / Codex) that 
 
 1. **Understand Farcaster Mini App requirements** by reading:
    - The Farcaster **"Getting Started"** documentation:  
-     `https://miniapps.farcaster.xyz/docs/getting-started`
+     `https://miniapps.farcaster.xyz/docs`
    - The `llms-full.txt` file for full spec context:  
      `https://miniapps.farcaster.xyz/llms-full.txt`
 
