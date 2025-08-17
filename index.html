@@ -4,34 +4,36 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🕶️ Tic Tac Vato — Minimal</title>
+
+  <!-- Share/launch cards (kept) -->
   <meta name="fc:miniapp" content='{
-  "version":"1",
-  "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
-  "button":{
-    "title":"Play Tic Tac Vato",
-    "action":{
-      "type":"launch_frame",
-      "name":"Tic Tac Vato",                      <!-- Required -->
-      "url":"https://vato.sqmu.io/index.html",
-      "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
-      "splashBackgroundColor":"#FF6B00"
+    "version":"1",
+    "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
+    "button":{
+      "title":"Play Tic Tac Vato",
+      "action":{
+        "type":"launch_frame",
+        "name":"Tic Tac Vato",
+        "url":"https://vato.sqmu.io/index.html",
+        "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
+        "splashBackgroundColor":"#FF6B00"
+      }
     }
-  }
-}' />
+  }' />
   <meta name="fc:frame" content='{
-  "version":"1",
-  "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
-  "button":{
-    "title":"Play Tic Tac Vato",
-    "action":{
-      "type":"launch_frame",
-      "name":"Tic Tac Vato",  <!-- Required -->
-      "url":"https://vato.sqmu.io/index.html",  <!-- Required -->
-      "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
-      "splashBackgroundColor":"#FF6B00"
+    "version":"1",
+    "imageUrl":"https://vato.sqmu.io/assets/og.jpg",
+    "button":{
+      "title":"Play Tic Tac Vato",
+      "action":{
+        "type":"launch_frame",
+        "name":"Tic Tac Vato",
+        "url":"https://vato.sqmu.io/index.html",
+        "splashImageUrl":"https://vato.sqmu.io/assets/og.jpg",
+        "splashBackgroundColor":"#FF6B00"
+      }
     }
-  }
-}' />
+  }' />
 
   <style>
     body { font-family: 'Courier New', monospace; max-width: 420px; margin: 0 auto; padding: 20px; background: #121212; color: #f0f0f0; }
@@ -55,12 +57,12 @@
   <h1>TIC TAC VATO</h1>
   <div class="subtitle">Outwit the Code Cholo</div>
 
-    <div class="panel" id="economy">
-      <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
-      <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">0.000010</span> ETH</strong></div></div>
-      <div class="row"><div>📈 Target</div><div><strong><span id="targetEth">0.100000</span> ETH</strong></div></div>
-      <small class="mono">When the pool hits 0.1 ETH, top 3 spenders win 40%, 30% and 20%. The pool then resets to 0.001 ETH.</small>
-    </div>
+  <div class="panel" id="economy">
+    <div class="row"><div>🏦 Current Prize Pool</div><div><strong><span id="poolEth">0.001000</span> ETH</strong></div></div>
+    <div class="row"><div>🎟 Entry Fee (1%)</div><div><strong><span id="feeEth">0.000010</span> ETH</strong></div></div>
+    <div class="row"><div>📈 Target</div><div><strong><span id="targetEth">0.100000</span> ETH</strong></div></div>
+    <small class="mono">When the pool hits 0.1 ETH, top 3 spenders win 40%, 30% and 20%. The pool then resets to 0.001 ETH.</small>
+  </div>
 
   <div class="row"><button id="connect">🔓 Connect Wallet</button></div>
   <div class="row"><button id="play" disabled>💸 Pay & Play</button></div>
@@ -84,172 +86,213 @@
     <ol id="lbList"><li>—</li><li>—</li><li>—</li></ol>
   </div>
 
-  <!-- Mini App SDK via ESM CDN, as suggested by the guide -->
-    <script type="module">
-      import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
-      import { Interface } from 'https://esm.sh/ethers@6';
+  <!-- Mini App SDK via ESM CDN -->
+  <script type="module">
+    import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+    import { Interface } from 'https://esm.sh/ethers@6';
 
-    // Wrap startup in an async function for wider compatibility
     (async () => {
-      // Display the app (hide host splash) once ready — critical per guide
-      await sdk.actions.ready();
+      await sdk.actions.ready(); // allow host to hide splash
 
-      // Get EIP-1193 provider from the Mini App SDK (no ethers)
       const provider = await sdk.wallet.getEthereumProvider();
-
-      // Enforce Arbitrum One (42161)
       const ARBITRUM_HEX = '0xa4b1';
-      let chainId = await provider.request({ method: 'eth_chainId' });
-      if (chainId !== ARBITRUM_HEX) {
+
+      // Elements
+      const els = {
+        poolEth: document.getElementById('poolEth'),
+        feeEth: document.getElementById('feeEth'),
+        targetEth: document.getElementById('targetEth'),
+        connect: document.getElementById('connect'),
+        play: document.getElementById('play'),
+        status: document.getElementById('status'),
+        board: document.getElementById('board'),
+        lbList: document.getElementById('lbList')
+      };
+
+      // Hard gate: require Arbitrum (no chain switching here)
+      const currentChain = await provider.request({ method: 'eth_chainId' });
+      if (currentChain !== ARBITRUM_HEX) {
+        els.status.textContent = 'This Mini App is only available on Arbitrum One.';
+        els.connect.disabled = true;
+        els.play.disabled = true;
+        return; // stop boot
+      }
+
+      // Load prize pool contract ABI + address
+      const { abi, address: CONTRACT } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json());
+      const iface = new Interface(abi);
+
+      // Common utils
+      const ETH = 10n ** 18n;
+      function fmtEth(wei) {
+        const whole = wei / ETH;
+        const frac = ((wei % ETH) * 1_000_000n) / ETH;
+        return `${whole}.${frac.toString().padStart(6, '0')}`;
+      }
+
+      // Read static config
+      const cfgData = iface.encodeFunctionData('getConfig');
+      const cfgRaw = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: cfgData }, 'latest'] });
+      const [MIN_POOL, MAX_POOL] = iface.decodeFunctionResult('getConfig', cfgRaw).map(x => BigInt(x));
+
+      // Dynamic state
+      let pool = 0n;
+      let fee  = 0n;
+      let player = '';
+
+      async function updateEconomyUI() {
+        const poolData = iface.encodeFunctionData('prizePool');
+        const rawPool = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: poolData }, 'latest'] });
+        pool = BigInt(rawPool);
+
+        const feeData = iface.encodeFunctionData('currentFee');
+        const rawFee = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: feeData }, 'latest'] });
+        fee = BigInt(rawFee);
+
+        els.poolEth.textContent = fmtEth(pool);
+        els.feeEth.textContent = fmtEth(fee);
+        els.targetEth.textContent = fmtEth(MAX_POOL);
+      }
+
+      async function updateLeaderboardUI() {
+        const lbData = iface.encodeFunctionData('getLeaderboard');
+        const raw = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: lbData }, 'latest'] });
+        const [addrs, amts] = iface.decodeFunctionResult('getLeaderboard', raw);
+
+        const rows = addrs.map((addr, i) => ({ addr, amt: BigInt(amts[i]) }))
+          .filter(x => x.addr !== '0x0000000000000000000000000000000000000000' && x.amt > 0n)
+          .map((x, i) => {
+            const pct = [40,30,20][i] ?? 0;
+            return `<li>${x.addr.slice(0,6)}…${x.addr.slice(-4)} — ${fmtEth(x.amt)} ETH (eligible ${pct}%)</li>`;
+          });
+
+        els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
+      }
+
+      await updateEconomyUI();
+      await updateLeaderboardUI();
+
+      // Connect flow (user gesture)
+      els.connect.onclick = async () => {
         try {
-          await provider.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: ARBITRUM_HEX }] });
-          chainId = ARBITRUM_HEX;
-        } catch (e) {
-          document.getElementById('status').textContent = 'Please switch to Arbitrum One (42161).';
-          throw e;
+          await provider.request({ method: 'eth_requestAccounts' });
+          const accounts = await provider.request({ method: 'eth_accounts' });
+          player = accounts?.[0] ?? '';
+          if (!player) {
+            els.status.textContent = 'Wallet not connected.';
+            els.play.disabled = true;
+            return;
+          }
+          els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
+          els.connect.style.background = '#4CAF50';
+          els.play.disabled = false;
+          els.status.innerHTML = '🕶️ <strong>Vato ready!</strong> Pay to play';
+        } catch {
+          els.status.textContent = 'Connection was cancelled or failed.';
         }
+      };
+
+      // React to provider changes
+      provider.on?.('accountsChanged', (accs) => {
+        const a0 = accs?.[0];
+        if (!a0) {
+          player = '';
+          els.connect.textContent = '🔓 Connect Wallet';
+          els.connect.style.background = '';
+          els.play.disabled = true;
+          els.status.textContent = '👉 Connect wallet to challenge the vato';
+          return;
+        }
+        player = a0;
+        els.connect.textContent = `✅ ${a0.slice(0,6)}…${a0.slice(-4)}`;
+        els.connect.style.background = '#4CAF50';
+        // keep play enabled when on correct chain
+        els.play.disabled = false;
+      });
+
+      provider.on?.('chainChanged', (cid) => {
+        if (cid !== ARBITRUM_HEX) {
+          els.play.disabled = true;
+          els.connect.disabled = true;
+          els.status.textContent = 'This Mini App is only available on Arbitrum One.';
+        } else {
+          els.connect.disabled = false;
+          if (player) els.play.disabled = false;
+        }
+      });
+
+      // --- Game logic (unchanged) ---
+      let board = ["","","","","","","","",""];
+      let gameActive = false;
+      const cells = [...document.querySelectorAll('.cell')];
+
+      cells.forEach(c => c.addEventListener('click', e => {
+        if (!gameActive) return;
+        const i = +e.currentTarget.dataset.index;
+        if (board[i] !== "") return;
+        board[i] = "X";
+        e.currentTarget.textContent = "X";
+        e.currentTarget.classList.add('x');
+        if (checkEnd()) return;
+        vatoMove();
+      }));
+
+      function checkEnd() {
+        const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        let win = null;
+        for (const [a,b,c] of W) if (board[a] && board[a]===board[b] && board[a]===board[c]) { win = board[a]; break; }
+        if (win || !board.includes("")) {
+          gameActive = false;
+          if (win === "X") els.status.innerHTML = "🎉 <strong>You won!</strong>";
+          else if (win === "O") els.status.innerHTML = "💀 <strong>Vato smoked you!</strong> Pay to try again";
+          else els.status.innerHTML = "🤝 <strong>Draw</strong>";
+          els.play.style.display = "block";
+          return true;
+        }
+        return false;
       }
 
-        // Load prize pool contract ABI + address
-        const { abi, address: CONTRACT } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json());
-        const iface = new Interface(abi);
-
-        // Elements
-        const els = {
-          poolEth: document.getElementById('poolEth'),
-          feeEth: document.getElementById('feeEth'),
-          targetEth: document.getElementById('targetEth'),
-          connect: document.getElementById('connect'),
-          play: document.getElementById('play'),
-          status: document.getElementById('status'),
-          board: document.getElementById('board'),
-          lbList: document.getElementById('lbList')
-        };
-
-        // Config from contract
-        const cfgData = iface.encodeFunctionData('getConfig');
-        const cfgRaw = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: cfgData }, 'latest'] });
-        const [MIN_POOL, MAX_POOL/*, feeBps*/] = iface.decodeFunctionResult('getConfig', cfgRaw).map(x => BigInt(x));
-        const ETH = 10n ** 18n;
-
-        function fmtEth(wei) {
-          const whole = wei / ETH;
-          const frac = ((wei % ETH) * 1_000_000n) / ETH;
-          return `${whole}.${frac.toString().padStart(6, '0')}`;
+      function minimax(b, playerMark) {
+        const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        const opp = playerMark === "X" ? "O" : "X";
+        for (const [i, j, k] of W)
+          if (b[i] && b[i] === b[j] && b[i] === b[k])
+            return { score: b[i] === "O" ? 10 : -10 };
+        if (!b.includes("")) return { score: 0 };
+        const moves = [];
+        for (let idx = 0; idx < 9; idx++) if (b[idx] === "") {
+          b[idx] = playerMark;
+          const result = minimax(b, opp);
+          moves.push({ index: idx, score: result.score });
+          b[idx] = "";
         }
-
-        let pool = 0n;
-        let fee = 0n;
-
-        async function updateEconomyUI() {
-          const poolData = iface.encodeFunctionData('prizePool');
-          const rawPool = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: poolData }, 'latest'] });
-          pool = BigInt(rawPool);
-          const feeData = iface.encodeFunctionData('currentFee');
-          const rawFee = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: feeData }, 'latest'] });
-          fee = BigInt(rawFee);
-          els.poolEth.textContent = fmtEth(pool);
-          els.feeEth.textContent = fmtEth(fee);
-          els.targetEth.textContent = fmtEth(MAX_POOL);
-        }
-
-        async function updateLeaderboardUI() {
-          const lbData = iface.encodeFunctionData('getLeaderboard');
-          const raw = await provider.request({ method: 'eth_call', params: [{ to: CONTRACT, data: lbData }, 'latest'] });
-          const [addrs, amts] = iface.decodeFunctionResult('getLeaderboard', raw);
-          const rows = addrs.map((addr, i) => ({ addr, amt: BigInt(amts[i]) }))
-            .filter(x => x.addr !== '0x0000000000000000000000000000000000000000' && x.amt > 0n)
-            .map((x, i) => {
-              const pct = [40,30,20][i] ?? 0;
-              return `<li>${x.addr.slice(0,6)}…${x.addr.slice(-4)} — ${fmtEth(x.amt)} ETH (eligible ${pct}%)</li>`;
-            });
-          els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
-        }
-
-        await updateEconomyUI();
-        await updateLeaderboardUI();
-
-    // Wallet connect
-    let player = '';
-    els.connect.onclick = async () => {
-      await provider.request({ method: 'eth_requestAccounts' });
-      const accounts = await provider.request({ method: 'eth_accounts' });
-      player = accounts[0] || '';
-      if (!player) return;
-      els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
-      els.connect.style.background = '#4CAF50';
-      els.play.disabled = false;
-      els.status.innerHTML = '🕶️ <strong>Vato ready!</strong> Pay to play';
-    };
-
-    // Tic-tac-toe
-    let board = ["","","","","","","","",""];
-    let gameActive = false;
-    const cells = [...document.querySelectorAll('.cell')];
-
-    cells.forEach(c => c.addEventListener('click', e => {
-      if (!gameActive) return;
-      const i = +e.currentTarget.dataset.index;
-      if (board[i] !== "") return;
-      board[i] = "X";
-      e.currentTarget.textContent = "X";
-      e.currentTarget.classList.add('x');
-      if (checkEnd()) return;
-      vatoMove();
-    }));
-
-    function checkEnd() {
-      const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-      let win = null;
-      for (const [a,b,c] of W) if (board[a] && board[a]===board[b] && board[a]===board[c]) { win = board[a]; break; }
-      if (win || !board.includes("")) {
-        gameActive = false;
-        if (win === "X") els.status.innerHTML = "🎉 <strong>You won!</strong>";
-        else if (win === "O") els.status.innerHTML = "💀 <strong>Vato smoked you!</strong> Pay to try again";
-        else els.status.innerHTML = "🤝 <strong>Draw</strong>";
-        els.play.style.display = "block";
-        return true;
+        return (playerMark === "O")
+          ? moves.reduce((best, x) => x.score > best.score ? x : best, moves[0])
+          : moves.reduce((best, x) => x.score < best.score ? x : best, moves[0]);
       }
-      return false;
-    }
-    function minimax(board, player) {
-      const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-      const opp = player === "X" ? "O" : "X";
-      for (const [i, j, k] of W)
-        if (board[i] && board[i] === board[j] && board[i] === board[k])
-          return { score: board[i] === "O" ? 10 : -10 };
-      if (!board.includes("")) return { score: 0 };
-      const moves = [];
-      for (let idx = 0; idx < 9; idx++) if (board[idx] === "") {
-        board[idx] = player;
-        const result = minimax(board, opp);
-        moves.push({ index: idx, score: result.score });
-        board[idx] = "";
-      }
-      return (player === "O")
-        ? moves.reduce((best, x) => x.score > best.score ? x : best, moves[0])
-        : moves.reduce((best, x) => x.score < best.score ? x : best, moves[0]);
-    }
-    function vatoMove() {
-      els.status.innerHTML = "🤔 <strong>Vato thinking…</strong>";
-      setTimeout(()=>{
-        const m = minimax([...board], "O");
-        board[m.index]="O";
-        const cell = document.querySelector(`.cell[data-index="${m.index}"]`);
-        cell.textContent="O"; cell.classList.add('o');
-        checkEnd();
-      }, 600);
-    }
-    function resetBoard() {
-      board = ["","","","","","","","",""];
-      cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
-    }
 
-      // Payment + play using prize pool contract
+      function vatoMove() {
+        els.status.innerHTML = "🤔 <strong>Vato thinking…</strong>";
+        setTimeout(()=>{
+          const m = minimax([...board], "O");
+          board[m.index] = "O";
+          const cell = document.querySelector(`.cell[data-index="${m.index}"]`);
+          cell.textContent = "O"; cell.classList.add('o');
+          checkEnd();
+        }, 600);
+      }
+
+      function resetBoard() {
+        board = ["","","","","","","","",""];
+        cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
+      }
+
+      // Payment + play
       els.play.onclick = async () => {
         try {
           await updateEconomyUI();
           els.status.innerHTML = `⏳ <strong>Paying ${fmtEth(fee)} ETH…</strong>`;
+
           const data = iface.encodeFunctionData('play');
           const txHash = await provider.request({
             method: 'eth_sendTransaction',
@@ -261,6 +304,8 @@
             }]
           });
 
+          // Optionally wait/verify tx here with eth_getTransactionReceipt
+
           await updateEconomyUI();
           await updateLeaderboardUI();
 
@@ -271,7 +316,7 @@
           els.status.innerHTML = "🔫 <strong>Your move</strong> (You're X)";
         } catch (err) {
           console.error(err);
-          els.status.innerHTML = `❌ <strong>Error:</strong> ${err.message || err}`;
+          els.status.innerHTML = `❌ <strong>Error:</strong> ${err?.message ?? err}`;
         }
       };
     })();
