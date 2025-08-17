@@ -92,7 +92,6 @@
       createPublicClient,
       custom,
       encodeFunctionData,
-      parseAbi,
       waitForTransactionReceipt,
     } from 'https://esm.sh/viem@2.9.32';
 
@@ -115,14 +114,7 @@
       };
 
       // Contract bindings
-      const CONTRACT_ADDR = '0xDB30fa8787C71Cf725E5b377130Df5fBEB3BbF5E';
-      const ABI = parseAbi([
-        'function prizePool() view returns (uint256)',
-        'function currentFee() view returns (uint256)',
-        'function getLeaderboard() view returns (address[3], uint256[3])',
-        'function previewPayouts() view returns (uint256,uint256,uint256,uint256)',
-        'function play() payable',
-      ]);
+      const { address: CONTRACT_ADDR, abi: ABI } = await fetch('abi/TicTacVatoPrizePool.json').then(r => r.json());
       if (!provider || typeof provider.request !== 'function') {
         els.status.textContent = 'Wallet provider missing. Open inside a Farcaster Mini App host.';
         throw new Error('No EIP-1193 provider');
