@@ -1,18 +1,21 @@
 {
-  "frame": {
-    "name": "Tic Tac Vato",
+  "miniapp": {
     "version": "1",
+    "name": "Tic Tac Vato",
     "iconUrl": "https://vato.sqmu.io/assets/icon.jpg",
     "homeUrl": "https://vato.sqmu.io",
     "imageUrl": "https://vato.sqmu.io/assets/og.jpg",
+    "buttonTitle": "Play Now",
     "splashImageUrl": "https://vato.sqmu.io/assets/og.jpg",
     "splashBackgroundColor": "#FF6B00",
     "webhookUrl": "https://vato.sqmu.io/api/webhook",
-    "subtitle": "Outwit the Code Cholo",
-    "description": "Tic Tac Vato, How Good Are You?",
-    "primaryCategory": "games"
+    "requiredChains": ["eip155:42161"],
+    "requiredCapabilities": [
+      "wallet.getEthereumProvider",
+      "actions.ready"
+    ]
   },
-"accountAssociation": {
+  "accountAssociation": {
     "header": "eyJmaWQiOjExMTUxNTIsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHhCQzdiQjBlMDAyOTNERDJFNDMxNTIyNTc2MzYzMDREM0NFNDQyNTcyIn0",
     "payload": "eyJkb21haW4iOiJ2YXRvLnNxbXUuaW8ifQ",
     "signature": "MHg4ZWMzYWNmMjNmYjRkMDEyODNlMGUwNzA5ZDVhZWVlYzZlNGY5MmM1YzIwMzUyNzQwZTJhODM2NGUzYmJjMGEwNTQ3ODU4MTYzNjQ3MjE1NzRkNGRlMzI2MzY3NzI4OTJkMzNkMzAzNWI4NmI5YjRhMTI3Yzg1YmU2ZjNiMDhjMDFj"
