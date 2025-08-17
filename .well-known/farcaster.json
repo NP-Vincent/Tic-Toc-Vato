@@ -1,4 +1,9 @@
 {
+  "accountAssociation": {
+    "header": "eyJmaWQiOjExMTUxNTIsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHhCQzdiQjBlMDAyOTNERDJFNDMxNTIyNTc2MzYzMDREM0NFNDQyNTcyIn0",
+    "payload": "eyJkb21haW4iOiJ2YXRvLnNxbXUuaW8ifQ",
+    "signature": "MHg4ZWMzYWNmMjNmYjRkMDEyODNlMGUwNzA5ZDVhZWVlYzZlNGY5MmM1YzIwMzUyNzQwZTJhODM2NGUzYmJjMGEwNTQ3ODU4MTYzNjQ3MjE1NzRkNGRlMzI2MzY3NzI4OTJkMzNkMzAzNWI4NmI5YjRhMTI3Yzg1YmU2ZjNiMDhjMDFj"
+  }
   "frame": {
     "name": "Tic Toc Vato",
     "version": "1",
@@ -12,9 +17,4 @@
     "description": "Tic Tac Vato, How Good Are You?",
     "primaryCategory": "games"
   },
-  "accountAssociation": {
-    "header": "eyJmaWQiOjExMTUxNTIsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHhCQzdiQjBlMDAyOTNERDJFNDMxNTIyNTc2MzYzMDREM0NFNDQyNTcyIn0",
-    "payload": "eyJkb21haW4iOiJ2YXRvLnNxbXUuaW8ifQ",
-    "signature": "MHg4ZWMzYWNmMjNmYjRkMDEyODNlMGUwNzA5ZDVhZWVlYzZlNGY5MmM1YzIwMzUyNzQwZTJhODM2NGUzYmJjMGEwNTQ3ODU4MTYzNjQ3MjE1NzRkNGRlMzI2MzY3NzI4OTJkMzNkMzAzNWI4NmI5YjRhMTI3Yzg1YmU2ZjNiMDhjMDFj"
-  }
 }
