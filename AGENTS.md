@@ -18,6 +18,7 @@ This file is intended for AI agents (e.g. GitHub Copilot, ChatGPT / Codex) that 
    - Creating metadata like app icons, OpenGraph tags, `fc:miniapp` embed meta
    - Suggesting improvements for UX, Discoverability, Testing
    - Ensuring `sdk.actions.ready()` is used correctly, and other best practices
+   - Maintaining the `contracts/` directory and keeping `index.html` in sync with the deployed contract address
 
 3. **Prompt the user with context-based questions**, **only referencing the docs** and not quoting from them verbatim. Example prompts:
    - “Should we create `farcaster.json` now with placeholders, or generate it later once the GH Pages URL is known?”
@@ -42,7 +43,8 @@ This file is intended for AI agents (e.g. GitHub Copilot, ChatGPT / Codex) that 
 This repository is structured for minimal dependencies and Farcaster compliance. AI agents should:
 
 - Reference the Farcaster docs for best practices
-- Assist in filling placeholders and verifying the app's integration with the Farcaster ecosystem
+- Maintain the prize pool contract in `contracts/` alongside the HTML client
+- Assist in filling placeholders (like the contract address) and verifying the app's integration with the Farcaster ecosystem
 - Guide without revealing the actual doc text, only paraphrase or reference where relevant
 
 Use the `llms-full.txt` spec in your workspace to stay context-aware of all requirements and examples.

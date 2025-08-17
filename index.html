@@ -87,16 +87,13 @@
   <!-- Mini App SDK via ESM CDN, as suggested by the guide -->
   <script type="module">
     import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+    import { ethers } from 'https://esm.sh/ethers@6';
 
-    // Wrap startup in an async function for wider compatibility
     (async () => {
-      // Display the app (hide host splash) once ready — critical per guide
       await sdk.actions.ready();
 
-      // Get EIP-1193 provider from the Mini App SDK (no ethers)
       const provider = await sdk.wallet.getEthereumProvider();
 
-      // Enforce Arbitrum One (42161)
       const ARBITRUM_HEX = '0xa4b1';
       let chainId = await provider.request({ method: 'eth_chainId' });
       if (chainId !== ARBITRUM_HEX) {
@@ -109,7 +106,19 @@
         }
       }
 
-      // Elements
+      const CONTRACT_ADDRESS = '0xYourContractAddress';
+      const ABI = [
+        'function prizePool() view returns (uint256)',
+        'function currentFee() view returns (uint256)',
+        'function getLeaderboard() view returns (address[3], uint256[3])',
+        'function play() payable',
+        'function getConfig() view returns (uint256 minPool, uint256 maxPool, uint16 feeBps)'
+      ];
+      const ethersProvider = new ethers.BrowserProvider(provider);
+      const signer = await ethersProvider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      let { maxPool: MAX_POOL } = await contract.getConfig();
+
       const els = {
         poolEth: document.getElementById('poolEth'),
         feeEth: document.getElementById('feeEth'),
@@ -120,165 +129,123 @@
         lbList: document.getElementById('lbList')
       };
 
-    // Economy in wei (BigInt); ETH = 1e18 wei
-    const ETH = 10n ** 18n;
-    const MIN_POOL = ETH / 1000n; // 0.001 ETH
-    const MAX_POOL = ETH / 10n;   // 0.1   ETH
-    let pool = MIN_POOL;
+      let player = null;
 
-    // Track top spenders (address → total spent in wei)
-    const spendMap = new Map();
-
-    function fmtEth(wei) {
-      // format to 6 dp without floating errors
-      const whole = wei / ETH;
-      const frac = ((wei % ETH) * 1_000_000n) / ETH; // 6 dp
-      return `${whole}.${frac.toString().padStart(6, '0')}`;
-    }
-    function feeFromPool(p) { return p / 100n; } // 1%
-
-    function updateEconomyUI() {
-      els.poolEth.textContent = fmtEth(pool);
-      els.feeEth.textContent = fmtEth(feeFromPool(pool));
-    }
-    function updateLeaderboardUI() {
-      const rows = [...spendMap.entries()]
-        .sort((a,b)=> (a[1] < b[1] ? 1 : -1))
-        .slice(0,3)
-        .map(([addr, wei], i) => {
-          const pct = [40,30,20][i] ?? 0;
-          return `<li>${addr.slice(0,6)}…${addr.slice(-4)} — ${fmtEth(wei)} ETH (eligible ${pct}%)</li>`;
-        });
-      els.lbList.innerHTML = rows.length ? rows.join('') : '<li>—</li><li>—</li><li>—</li>';
-    }
-    updateEconomyUI(); updateLeaderboardUI();
-
-    // Wallet connect
-    let player = '';
-    els.connect.onclick = async () => {
-      await provider.request({ method: 'eth_requestAccounts' });
-      const accounts = await provider.request({ method: 'eth_accounts' });
-      player = accounts[0] || '';
-      if (!player) return;
-      els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
-      els.connect.style.background = '#4CAF50';
-      els.play.disabled = false;
-      els.status.innerHTML = '🕶️ <strong>Vato ready!</strong> Pay to play';
-    };
-
-    // Tic-tac-toe
-    let board = ["","","","","","","","",""];
-    let gameActive = false;
-    const cells = [...document.querySelectorAll('.cell')];
-
-    cells.forEach(c => c.addEventListener('click', e => {
-      if (!gameActive) return;
-      const i = +e.currentTarget.dataset.index;
-      if (board[i] !== "") return;
-      board[i] = "X";
-      e.currentTarget.textContent = "X";
-      e.currentTarget.classList.add('x');
-      if (checkEnd()) return;
-      vatoMove();
-    }));
-
-    function checkEnd() {
-      const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-      let win = null;
-      for (const [a,b,c] of W) if (board[a] && board[a]===board[b] && board[a]===board[c]) { win = board[a]; break; }
-      if (win || !board.includes("")) {
-        gameActive = false;
-        if (win === "X") els.status.innerHTML = "🎉 <strong>You won!</strong>";
-        else if (win === "O") els.status.innerHTML = "💀 <strong>Vato smoked you!</strong> Pay to try again";
-        else els.status.innerHTML = "🤝 <strong>Draw</strong>";
-        els.play.style.display = "block";
-        return true;
+      function fmtEth(v) {
+        return Number(ethers.formatEther(v)).toFixed(6);
       }
-      return false;
-    }
-    function minimax(board, player) {
-      const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-      const opp = player === "X" ? "O" : "X";
-      for (const [i, j, k] of W)
-        if (board[i] && board[i] === board[j] && board[i] === board[k])
-          return { score: board[i] === "O" ? 10 : -10 };
-      if (!board.includes("")) return { score: 0 };
-      const moves = [];
-      for (let idx = 0; idx < 9; idx++) if (board[idx] === "") {
-        board[idx] = player;
-        const result = minimax(board, opp);
-        moves.push({ index: idx, score: result.score });
-        board[idx] = "";
+
+      async function refreshEconomy() {
+        const poolWei = await contract.prizePool();
+        const feeWei = await contract.currentFee();
+        els.poolEth.textContent = fmtEth(poolWei);
+        els.feeEth.textContent = fmtEth(feeWei);
+        return poolWei;
       }
-      return (player === "O")
-        ? moves.reduce((best, x) => x.score > best.score ? x : best, moves[0])
-        : moves.reduce((best, x) => x.score < best.score ? x : best, moves[0]);
-    }
-    function vatoMove() {
-      els.status.innerHTML = "🤔 <strong>Vato thinking…</strong>";
-      setTimeout(()=>{
-        const m = minimax([...board], "O");
-        board[m.index]="O";
-        const cell = document.querySelector(`.cell[data-index="${m.index}"]`);
-        cell.textContent="O"; cell.classList.add('o');
-        checkEnd();
-      }, 600);
-    }
-    function resetBoard() {
-      board = ["","","","","","","","",""];
-      cells.forEach(c=>{ c.textContent=""; c.className="cell"; });
-    }
 
-    // Payment + play
-    const HOUSE_WALLET = '0x8Db45f90ef4eBFC6D133C1b2c6ac742B2AE653Aa';
-    els.play.onclick = async () => {
-      try {
-        // Entry fee = 1% of current pool
-        const fee = feeFromPool(pool);
-        const toHouse = fee / 2n;         // 50% → house
-        const toPool  = fee - toHouse;    // 50% → pool (exact split)
+      async function refreshLeaderboard() {
+        const [addrs, amts] = await contract.getLeaderboard();
+        els.lbList.innerHTML = addrs.map((a, i) =>
+          a === ethers.ZeroAddress ? '<li>—</li>' :
+          `<li>${a.slice(0,6)}…${a.slice(-4)} — ${fmtEth(amts[i])} ETH</li>`
+        ).join('');
+      }
 
-        els.status.innerHTML = `⏳ <strong>Paying ${fmtEth(fee)} ETH…</strong>`;
+      els.connect.onclick = async () => {
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+        player = accounts[0];
+        if (!player) return;
+        els.connect.textContent = `✅ ${player.slice(0,6)}…${player.slice(-4)}`;
+        els.connect.style.background = '#4CAF50';
+        els.play.disabled = false;
+        els.status.innerHTML = '🕶️ <strong>Vato ready!</strong> Pay to play';
+        await refreshEconomy();
+        await refreshLeaderboard();
+      };
 
-        // One simple transfer to house wallet on Arbitrum
-        const txHash = await provider.request({
-          method: 'eth_sendTransaction',
-          params: [{
-            from: player,
-            to: HOUSE_WALLET,
-            value: '0x' + toHouse.toString(16)
-          }]
-        });
-        // Optional: poll for receipt if you want confirmation UI (omitted for minimalism)
+      let board = ["","","","","","","","",""];
+      let gameActive = false;
+      const cells = [...document.querySelectorAll('.cell')];
 
-        // Update pool locally
-        pool = pool + toPool;
-        if (pool > MAX_POOL) pool = MAX_POOL;
-        updateEconomyUI();
+      cells.forEach(c => c.addEventListener('click', e => {
+        if (!gameActive) return;
+        const i = +e.currentTarget.dataset.index;
+        if (board[i] !== '') return;
+        board[i] = 'X';
+        e.currentTarget.textContent = 'X';
+        e.currentTarget.classList.add('x');
+        if (checkEnd()) return;
+        vatoMove();
+      }));
 
-        // Track spender for leaderboard
-        const prev = spendMap.get(player) || 0n;
-        spendMap.set(player, prev + fee);
-        updateLeaderboardUI();
-
-        // Start game
-        resetBoard();
-        gameActive = true;
-        els.board.style.display = "grid";
-        els.play.style.display = "none";
-        els.status.innerHTML = "🔫 <strong>Your move</strong> (You're X)";
-
-        // Payout trigger message
-        if (pool >= MAX_POOL) {
-          els.status.innerHTML += `<br>💰 <strong>PAYOUT TRIGGERED</strong> — 40/30/20% to top 3`;
-          pool = MIN_POOL; updateEconomyUI();
-          // spendMap.clear(); updateLeaderboardUI(); // optional reset
+      function checkEnd() {
+        const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        let win = null;
+        for (const [a,b,c] of W) if (board[a] && board[a]===board[b] && board[a]===board[c]) { win = board[a]; break; }
+        if (win || !board.includes('')) {
+          gameActive = false;
+          if (win === 'X') els.status.innerHTML = '🎉 <strong>You won!</strong>';
+          else if (win === 'O') els.status.innerHTML = '💀 <strong>Vato smoked you!</strong> Pay to try again';
+          else els.status.innerHTML = '🤝 <strong>Draw</strong>';
+          els.play.style.display = 'block';
+          return true;
         }
-      } catch (err) {
-        console.error(err);
-        els.status.innerHTML = `❌ <strong>Error:</strong> ${err.message || err}`;
+        return false;
       }
-    };
+      function minimax(board, player) {
+        const W = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        const opp = player === 'X' ? 'O' : 'X';
+        for (const [i, j, k] of W)
+          if (board[i] && board[i] === board[j] && board[i] === board[k])
+            return { score: board[i] === 'O' ? 10 : -10 };
+        if (!board.includes('')) return { score: 0 };
+        const moves = [];
+        for (let idx = 0; idx < 9; idx++) if (board[idx] === '') {
+          board[idx] = player;
+          const result = minimax(board, opp);
+          moves.push({ index: idx, score: result.score });
+          board[idx] = '';
+        }
+        return (player === 'O')
+          ? moves.reduce((best, x) => x.score > best.score ? x : best, moves[0])
+          : moves.reduce((best, x) => x.score < best.score ? x : best, moves[0]);
+      }
+      function vatoMove() {
+        els.status.innerHTML = '🤔 <strong>Vato thinking…</strong>';
+        setTimeout(()=>{
+          const m = minimax([...board], 'O');
+          board[m.index]='O';
+          const cell = document.querySelector(`.cell[data-index="${m.index}"]`);
+          cell.textContent='O'; cell.classList.add('o');
+          checkEnd();
+        }, 600);
+      }
+      function resetBoard() {
+        board = ["","","","","","","","",""];
+        cells.forEach(c=>{ c.textContent=""; c.className='cell'; });
+      }
+
+      els.play.onclick = async () => {
+        try {
+          const fee = await contract.currentFee();
+          els.status.innerHTML = `⏳ <strong>Paying ${fmtEth(fee)} ETH…</strong>`;
+          const tx = await contract.play({ value: fee });
+          await tx.wait();
+          const poolWei = await refreshEconomy();
+          await refreshLeaderboard();
+          resetBoard();
+          gameActive = true;
+          els.board.style.display = 'grid';
+          els.play.style.display = 'none';
+          els.status.innerHTML = '🔫 <strong>Your move</strong> (You\'re X)';
+          if (poolWei >= MAX_POOL) {
+            els.status.innerHTML += '<br>💰 <strong>PAYOUT TRIGGERED</strong> — 40/30/20% to top 3';
+          }
+        } catch (err) {
+          console.error(err);
+          els.status.innerHTML = `❌ <strong>Error:</strong> ${err.message || err}`;
+        }
+      };
     })();
   </script>
 </body>
