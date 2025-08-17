@@ -53,7 +53,7 @@ A minimalist Farcaster Mini App that lets users play Tic Tac Toe ("Tic Tac Vato"
 
 ---
 
-> “Please research and analyze this page: https://miniapps.farcaster.xyz/docs/gettingstarted so I can ask you questions about it. Once you have read it, prompt me with any questions I have. Do not post content from the page in your response. Any of my follow up questions must reference the site I gave you.”  
+> “Please research and analyze this page: https://miniapps.farcaster.xyz/docs/getting-started so I can ask you questions about it. Once you have read it, prompt me with any questions I have. Do not post content from the page in your response. Any of my follow up questions must reference the site I gave you.”  
 >
 > Reference `https://miniapps.farcaster.xyz/llms-full.txt`
 
