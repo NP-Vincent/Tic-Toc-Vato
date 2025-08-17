@@ -39,7 +39,7 @@ A minimalist Farcaster Mini App that lets users play Tic Tac Toe ("Tic Tac Vato"
 ## What’s next
 
 1. **Create the GitHub repository** and add this `index.html`.
-2. Set up **GitHub Pages** and note the domain (e.g., `https://your-gh-username.github.io/`)
+2. Set up **GitHub Pages** and note the domain (e.g., `https://vato.sqmu.io`)
 3. Use the Domain to generate a proper `/.well-known/farcaster.json` manifest.
 4. Enable badges, search/discovery, and AI-guided enhancements using LLM.
 
