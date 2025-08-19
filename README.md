@@ -11,7 +11,7 @@ A minimalist Farcaster Mini App that lets users play Tic Tac Toe ("Tic Tac Vato"
   - **Pool range:** 0.001 – 0.1 ETH
   - **Fee:** 1% of current pool; 50% to house wallet, 50% to pool
   - **Payout trigger:** at 0.1 ETH, displays top-3 spenders (40/30/20%)
-- **LLM-friendly**: includes navigation for Codex/AI agent assistance using Farcaster's `llms-full.txt`
+  - **LLM-friendly**: includes navigation for Codex/AI agent assistance using Farcaster's `llms-full.txt` (mirrored locally as `minapp-farcaster-llms-full.txt`)
 - **Admin panel**: `admin.html` lets the contract owner seed or fund the pool and change the house wallet
 
 ## Contents
@@ -68,3 +68,8 @@ A minimalist Farcaster Mini App that lets users play Tic Tac Toe ("Tic Tac Vato"
 > Reference `https://miniapps.farcaster.xyz/llms-full.txt`
 
 Keep the `llms-full.txt` document in your AI agent’s context for live assistance. Codex can refer to it for guidance.
+
+For development and troubleshooting, consult the Agents checklist:
+`https://miniapps.farcaster.xyz/docs/guides/agents-checklist`
+
+A more detailed reference is available locally in `minapp-farcaster-llms-full.txt`, which mirrors `https://miniapps.farcaster.xyz/llms-full.txt`.

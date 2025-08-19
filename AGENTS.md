@@ -7,10 +7,12 @@ This file is intended for AI agents (e.g. GitHub Copilot, ChatGPT / Codex) that 
 ## Goals for AI Agents
 
 1. **Understand Farcaster Mini App requirements** by reading:
-   - The Farcaster **"Getting Started"** documentation:  
+   - The Farcaster **"Getting Started"** documentation:
      `https://miniapps.farcaster.xyz/docs/getting-started`
-   - The `llms-full.txt` file for full spec context:  
-     `https://miniapps.farcaster.xyz/llms-full.txt`
+   - The `llms-full.txt` file for full spec context:
+      `https://miniapps.farcaster.xyz/llms-full.txt` (mirrored locally as `minapp-farcaster-llms-full.txt`)
+   - The "Agents checklist" for developing and troubleshooting:
+      `https://miniapps.farcaster.xyz/docs/guides/agents-checklist`
 
 2. **Assist project tasks** such as:
    - Updating `index.html` to match guidance (e.g., manifest embed, meta tags, capabilities)
@@ -50,4 +52,4 @@ This repository is structured for minimal dependencies and Farcaster compliance.
 - Assist in filling placeholders (like the contract address) and verifying the app's integration with the Farcaster ecosystem
 - Guide without revealing the actual doc text, only paraphrase or reference where relevant
 
-Use the `llms-full.txt` spec in your workspace to stay context-aware of all requirements and examples.
+Use the `minapp-farcaster-llms-full.txt` spec in your workspace to stay context-aware of all requirements and examples.
